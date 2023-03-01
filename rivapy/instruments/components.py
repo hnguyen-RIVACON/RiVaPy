@@ -66,34 +66,41 @@ class Issuer(interfaces.FactoryObject):
         self.__sector = Sector.to_string(sector)
 
     @staticmethod
-    def _create_sample(n_samples: int, seed: int = None, issuer: List[str] = None)->List:
+    def _create_sample(n_samples: int, seed: int = None, issuer: List[str] = None, 
+                    rating_probs: np.ndarray = None)->List:
         """Just sample some test data
 
         Args:
-            n_samples (int): _description_
-            seed (int, optional): _description_. Defaults to None.
-            issuer (List[str], optional): _description_. Defaults to None.
-
+            n_samples (int): Number of samples.
+            seed (int, optional): If set, the seed is set, if None, no seed is explicitely set. Defaults to None.
+            issuer (List[str], optional): List of issuer names chosen from. If None, a unqiue name for each samples is generated. Defaults to None.
+            rating_probs (np.ndarray): Numpy array defining the probability for each rating (ratings ordererd from AAA (first) to D (last array element)). If None, all ratings are chosen with equal probabilities.
         Raises:
             Exception: _description_
 
         Returns:
-            List: _description_
+            List: List of sampled issuers.
         """
         if seed is not None:
             np.random.seed(seed)
         result = []
         ratings = list(Rating)
+        if rating_probs is not None:
+            if len(ratings) != rating_probs.shape[0]:
+                raise Exception('Number of rating probabilities must equal number of ratings')
+        else:
+            rating_probs = np.ones((len(ratings,)))/len(ratings,)
+            
         esg_ratings = list(ESGRating)
         sectors = list(Sector)
         country = list(Country)
         if issuer is None:
             issuer = ['Issuer_'+str(i) for i in range(n_samples)]
         elif (n_samples is not None) and (n_samples !=  len(issuer)):
-            raise Exception('Cannot create data since length of issuer list does not equal number of sampled. Set n_namples to None.')
+            raise Exception('Cannot create data since length of issuer list does not equal number of samples. Set n_namples to None.')
         for i in range(n_samples):
             result.append(Issuer('Issuer_'+str(i), issuer[i],
-                        np.random.choice(ratings), 
+                        np.random.choice(ratings, p=rating_probs), 
                         np.random.choice(esg_ratings), 
                         np.random.choice(country).value,
                         np.random.choice(sectors)))

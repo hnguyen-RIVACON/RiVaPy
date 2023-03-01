@@ -1,4 +1,5 @@
 import numpy as np
+import datetime as dt
 from rivapy.tools.enums import Currency, ESGRating, Rating, Sector, Country, SecuritizationLevel
 from rivapy.marketdata import DiscountCurveParametrized, NelsonSiegel, LinearRate, ConstantRate
 from rivapy.instruments.components import Issuer
@@ -19,7 +20,7 @@ class SpreadCurveSampler:
         """
         pass
     
-    def sample(self, ref_date):
+    def sample(self, ref_date: dt.datetime)->dict:
         min_params = {'min_short_term_rate': -0.01, 
                           'max_short_term_rate': 0.02, 
                           'min_long_run_rate': 0.0,
@@ -44,25 +45,27 @@ class SpreadCurveSampler:
         curve_worst_rating = curve_best_rating + DiscountCurveParametrized('', ref_date, 
                                                            NelsonSiegel._create_sample(n_samples=1, 
                                                                                      seed=None,**max_params)[0])
-        self.rating_curve = (curve_best_rating, curve_worst_rating)
+        self.rating_curve = [curve_best_rating, curve_worst_rating]
         self._sample_currency_spread()
         self._sample_esg_rating_spreads()
         self._sample_rating_weights()
         self._sample_sector_spreads()
         self._sample_country_curves(ref_date=ref_date)
         self._sample_sec_level_spreads()
-        
+        return {'rating_curves': self.rating_curve,'currency_spread': self.currency_spread,'esg_rating_spread': self.esg_rating_spread,
+                  'rating_weights': self.rating_weights, 'sector_spreads': self.sector_spreads, 'country_curves': self.country_curves,
+                  'securitization_spreads': self.securitization_spreads}
         
     def _sample_currency_spread(self):
         self.currency_spread = {}
         low = np.random.uniform(0.005,0.01)
         high = low + np.random.uniform(0.0,0.1)
         for c in Currency:
-            self.currency_spread[c.value] = (low, high)
+            self.currency_spread[c.value] = [low, high]
         for c in [Currency.EUR, Currency.USD, Currency.GBP, Currency.JPY]:
             low = np.random.uniform(0.0,0.01)
             high = low + np.random.uniform(0.0,0.1)
-            self.currency_spread[c.value] = (low, high)
+            self.currency_spread[c.value] = [low, high]
         
     def _sample_esg_rating_spreads(self):
         self.esg_rating_spread = {}
@@ -108,6 +111,16 @@ class SpreadCurveSampler:
         low = np.random.uniform(0.01, 0.025) + result[SecuritizationLevel.SENIOR_UNSECURED.value][1]
         result[SecuritizationLevel.SUBORDINATED.value] = (low, low + 0.03)
         self.securitization_spreads = result
+
+    def set_params(self, params: dict):
+        self.rating_curve = params['rating_curves']
+        self.currency_spread = params['currency_spread']
+        self.esg_rating_spread = params['esg_rating_spread']
+        self.rating_weights = params['rating_weights']
+        self.sector_spreads = params['sector_spreads']
+        self.country_curves = params['country_curves']
+        self.securitization_spreads = params['securitization_spreads']
+        
         
     def get_curve(self, issuer: Issuer, bond: PlainVanillaCouponBondSpecification):
         logger.info('computing curve for issuer ' + issuer.name + ' and bond ' + bond.obj_id)
