@@ -12,11 +12,22 @@ class SpreadCurveSampler:
             
             * issuer rating (for all ratings defined in :class:`rivapy.tools.enums.Rating`)
             * currency (for all currencies defined in :class:`rivapy.tools.enums.Currency`)
+            * country (for all countries defined in :class:`rivapy.tools.enums.Country`)
             * esg rating (for all ratings defined in :class:`rivapy.tools.enums.ESGRating`)
             * sector (for all sectors defined in :class:`rivapy.tools.enums.Sector`)
             * securitization level (only SENIOR_SECURED, SENIOR_UNSECURED and SUBORDINATED are currently handled)
 
-            Note that this does not include securitization levels at the moment.
+            An object of this class provides the method :meth:`get_curve` that returns a spread curve that may be adequate to price
+            a bond of the given specification and issuer.
+
+            As basis for the curve creation this method uses the Nelson-Siegel Parametrization, see :class:`rivapy.marketdata.curves.NelsonSiegel` for a more detailed description 
+            of this parametrization. Each curve is constructed so that for all of the features above fixed, the curve is consistet w.r.t. the issuer rating in 
+            the sense that a curve of a higher rating is strictly below the curve of a lower rating.
+
+            The construction is as follows:
+
+            We create two Nelson-Siegel parameterized curves by sampling the Nelson-Siegel parameters
+             
         """
         pass
     
