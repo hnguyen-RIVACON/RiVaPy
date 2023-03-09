@@ -82,9 +82,9 @@ class SpreadCurveSampler:
         self.esg_rating_spread = {}
         low = 0.0
         for i,s in enumerate(ESGRating):
-            high = low + np.random.uniform(low=0.001, high=0.0025)
+            high = low + np.random.uniform(low=0.01, high=0.07)
             self.esg_rating_spread[s.value] = (low, high)
-            low = high
+            low = high+0.01
         
     def _sample_rating_weights(self):
         rating_weights = np.random.uniform(low=1.0, high=4.0, size=len(Rating)).cumsum()
@@ -146,4 +146,6 @@ class SpreadCurveSampler:
         securitization_spread = w1*self.securitization_spreads[bond.securitization_level][0] + w2* self.securitization_spreads[bond.securitization_level][1]
         curve = 0.5*rating_curve + 0.5*(0.3*country_spread + 0.3*securitization_spread 
                         + 0.2*esg_spread + 0.1*sector_spread+0.1*currency_spread)
+        #curve = 0.5*rating_curve + 0.5*esg_spread#(0.3*country_spread + 0.3*securitization_spread 
+        #                #+ 0.2*esg_spread + 0.1*sector_spread+0.1*currency_spread)
         return curve
