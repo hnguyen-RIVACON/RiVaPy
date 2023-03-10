@@ -464,6 +464,7 @@ _add_to_factory(NelsonSiegelSvensson)
 _add_to_factory(ConstantRate)
 _add_to_factory(LinearRate)
 _add_to_factory(DiscountCurveParametrized)
+_add_to_factory(DiscountCurveComposition)
 
 if __name__=='__main__':
     svi = VolatilityParametrizationSVI(expiries=np.array([1.0/365.0, 1.0]), svi_params=[

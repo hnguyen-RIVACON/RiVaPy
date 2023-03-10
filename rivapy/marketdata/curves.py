@@ -318,6 +318,12 @@ class NelsonSiegelSvensson(NelsonSiegel):
 class DiscountCurveComposition(interfaces.FactoryObject):
     def __init__(self, a, b, c):
         # check if all discount curves have the same daycounter, otherwise exception
+        if isinstance(a,dict):
+            a = _create(a)
+        if isinstance(b,dict):
+            b = _create(b)
+        if isinstance(c,dict):
+            c = _create(c)
         dc = set()
         for k in [a,b,c]:
             if hasattr(k, 'daycounter'):
@@ -341,8 +347,30 @@ class DiscountCurveComposition(interfaces.FactoryObject):
         
 
     def _to_dict(self) -> dict:
-        raise NotImplementedError()
+        if hasattr(self.a, 'to_dict'):
+            a = self.a.to_dict()
+        else:
+            a = self.a
+        if hasattr(self.b, 'to_dict'):
+            b = self.b.to_dict()
+        else:
+            b = self.b
+        if hasattr(self.c, 'to_dict'):
+            c = self.c.to_dict()
+        else:
+            c = self.c
+        return {'a':a, 'b': b, 'c': c}
         
+        
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None, refdate: Union[datetime, date]=None, 
+                       parametrization_type = NelsonSiegel)->list:
+        curves = DiscountCurveParametrized._create_sample(n_samples, seed, refdate, parametrization_type)
+        results = []
+        for c in curves:
+            results.append(c+0.001)
+        return results
+
     def value(self, refdate: Union[date, datetime], d: Union[date, datetime])->float:
         r = self.value_rate(refdate, d)
         yf = self._dc.yf(refdate, d)
