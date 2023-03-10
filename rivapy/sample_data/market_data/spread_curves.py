@@ -144,8 +144,8 @@ class SpreadCurveSampler:
                           'max_short_term_rate': 0.02, 
                           'min_long_run_rate': 0.0,
                           'max_long_run_rate': 0.03,
-                          'min_hump': -0.02,
-                          'max_hump': 0.05,
+                          'min_hump': -0.3,
+                          'max_hump': 0.5,
                           'min_tau': 0.5,
                           'max_tau': 3.0}
         
@@ -153,7 +153,7 @@ class SpreadCurveSampler:
                           'max_short_term_rate': 0.25, 
                           'min_long_run_rate': 0.1,
                           'max_long_run_rate': 0.25,
-                          'min_hump': 0.0,
+                          'min_hump': -0.3,
                           'max_hump': 0.3,
                           'min_tau': 0.5,
                           'max_tau': 5.0}
