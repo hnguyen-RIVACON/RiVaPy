@@ -1,10 +1,82 @@
 import numpy as np
 import datetime as dt
+from typing import Union, Tuple, Dict
+from rivapy.tools.interfaces import FactoryObject
 from rivapy.tools.enums import Currency, ESGRating, Rating, Sector, Country, SecuritizationLevel
 from rivapy.marketdata import DiscountCurveParametrized, NelsonSiegel, LinearRate, ConstantRate
+from rivapy.marketdata.factory import create as _create
 from rivapy.instruments.components import Issuer
 from rivapy.instruments import PlainVanillaCouponBondSpecification
 from rivapy.sample_data._logger import logger
+
+class SpreadCurveCollection(FactoryObject):
+
+    @staticmethod
+    def _create_curve_or_float(x: Union[FactoryObject, dict, float]):
+        if isinstance(x, list) or isinstance(x, tuple):
+            if len(x) != 2:
+                raise NotImplementedError('All list and tuples must have length equal 2.')
+            return [SpreadCurveCollection._create_curve_or_float(x[0]), SpreadCurveCollection._create_curve_or_float(x[1])]
+        if isinstance(x,dict):
+            return _create(x)
+        return x
+        
+    @staticmethod
+    def _dict_entry(x):
+        if isinstance(x, list) or isinstance(x, tuple):
+            if len(x) != 2:
+                raise NotImplementedError('All list and tuples must have length equal 2.')
+            return [SpreadCurveCollection._dict_entry(x[0]), SpreadCurveCollection._dict_entry(x[1])]
+        if hasattr(x,'to_dict'):
+            return x.to_dict()
+        if isinstance(x,dict):
+            return {k: SpreadCurveCollection._dict_entry(v) for k,v in x.items()}
+        return x
+        
+    def __init__(self, ref_date: dt.datetime,
+                    rating_curve:Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]],
+                    currency_spread: Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]],
+                    esg_spreads: Dict[str, float],
+                    rating_weights: Dict[str, float],
+                    sector_spreads: Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]],
+                    country_curves: Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]],
+                    sec_level_spreads: Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]]
+                    ):
+        self.ref_date = ref_date
+        self.rating_curve = [SpreadCurveCollection._create_curve_or_float(rating_curve[0]), SpreadCurveCollection._create_curve_or_float(rating_curve[1])]
+        self.currency_spread = { k:SpreadCurveCollection._create_curve_or_float(v) for k,v in currency_spread.items() }
+        self.esg_spreads = esg_spreads
+        self.rating_weights = rating_weights
+        self.sector_spreads = { k:SpreadCurveCollection._create_curve_or_float(v) for k,v in sector_spreads.items() }
+        self.country_curves = { k:SpreadCurveCollection._create_curve_or_float(v) for k,v in country_curves.items() }
+        self.sec_level_spreads = { k:SpreadCurveCollection._create_curve_or_float(v) for k,v in sec_level_spreads.items() }
+
+    def _to_dict(self) -> dict:
+        tmp = {'ref_date': self.ref_date, 
+               'rating_curve': SpreadCurveCollection._dict_entry(self.rating_curve),
+               'currency_spread': SpreadCurveCollection._dict_entry(self.currency_spread),
+               'esg_spreads': SpreadCurveCollection._dict_entry(self.esg_spreads),
+               'rating_weights': SpreadCurveCollection._dict_entry(self.rating_weights),
+               'sector_spreads': SpreadCurveCollection._dict_entry(self.sector_spreads),
+               'country_curves': SpreadCurveCollection._dict_entry(self.country_curves),
+               'sec_level_spreads': SpreadCurveCollection._dict_entry(self.sec_level_spreads),
+               }
+        return tmp
+    
+    def get_curve(self, issuer: Issuer, bond: PlainVanillaCouponBondSpecification):
+        logger.info('computing curve for issuer ' + issuer.name + ' and bond ' + bond.obj_id)
+        rating_weight = self.rating_weights[issuer.rating]
+        w1 = 1.0-rating_weight
+        w2 = rating_weight
+        rating_curve = w1*self.rating_curve[0] + w2*self.rating_curve[1]
+        country_spread = w1*self.country_curves[issuer.country][0] + w2*self.country_curves[issuer.country][1]
+        esg_spread = w1*self.esg_spreads[issuer.esg_rating][0] +  w2*self.esg_spreads[issuer.esg_rating][1]
+        sector_spread = w1*self.sector_spreads[issuer.sector][0] + w2*self.sector_spreads[issuer.sector][1]
+        currency_spread = w1*self.currency_spread[bond.currency][0] + w2*self.currency_spread[bond.currency][1]
+        securitization_spread = w1*self.sec_level_spreads[bond.securitization_level][0] + w2* self.sec_level_spreads[bond.securitization_level][1]
+        curve = 0.5*rating_curve + 0.5*(0.3*country_spread + 0.3*securitization_spread + 0.2*esg_spread + 0.1*sector_spread+0.1*currency_spread)
+        return curve
+
 
 class SpreadCurveSampler:
     def __init__(self):
@@ -66,7 +138,42 @@ class SpreadCurveSampler:
         return {'rating_curves': self.rating_curve,'currency_spread': self.currency_spread,'esg_rating_spread': self.esg_rating_spread,
                   'rating_weights': self.rating_weights, 'sector_spreads': self.sector_spreads, 'country_curves': self.country_curves,
                   'securitization_spreads': self.securitization_spreads}
+
+    def sample_new(self, ref_date: dt.datetime)->SpreadCurveCollection:
+        min_params = {'min_short_term_rate': -0.01, 
+                          'max_short_term_rate': 0.02, 
+                          'min_long_run_rate': 0.0,
+                          'max_long_run_rate': 0.03,
+                          'min_hump': -0.02,
+                          'max_hump': 0.05,
+                          'min_tau': 0.5,
+                          'max_tau': 3.0}
         
+        max_params = {'min_short_term_rate': 0.1, 
+                          'max_short_term_rate': 0.25, 
+                          'min_long_run_rate': 0.1,
+                          'max_long_run_rate': 0.25,
+                          'min_hump': 0.0,
+                          'max_hump': 0.3,
+                          'min_tau': 0.5,
+                          'max_tau': 5.0}
+        
+        curve_best_rating = DiscountCurveParametrized('', ref_date, 
+                                                           NelsonSiegel._create_sample(n_samples=1, 
+                                                                                       seed=None,**min_params)[0])
+        curve_worst_rating = curve_best_rating + DiscountCurveParametrized('', ref_date, 
+                                                           NelsonSiegel._create_sample(n_samples=1, 
+                                                                                     seed=None,**max_params)[0])
+        self.rating_curve = [curve_best_rating, curve_worst_rating]
+        self._sample_currency_spread()
+        self._sample_esg_rating_spreads()
+        self._sample_rating_weights()
+        self._sample_sector_spreads()
+        self._sample_country_curves(ref_date=ref_date)
+        self._sample_sec_level_spreads()
+        return SpreadCurveCollection(ref_date, self.rating_curve, self.currency_spread, self.esg_rating_spread, self.rating_weights, 
+                                     self.sector_spreads, self.country_curves, self.securitization_spreads )
+  
     def _sample_currency_spread(self):
         self.currency_spread = {}
         low = np.random.uniform(0.005,0.01)
@@ -131,6 +238,7 @@ class SpreadCurveSampler:
         self.sector_spreads = params['sector_spreads']
         self.country_curves = params['country_curves']
         self.securitization_spreads = params['securitization_spreads']
+
         
         
     def get_curve(self, issuer: Issuer, bond: PlainVanillaCouponBondSpecification):
