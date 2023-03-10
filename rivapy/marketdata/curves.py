@@ -373,7 +373,7 @@ class DiscountCurveParametrized(interfaces.FactoryObject):
             parametrization = self.rate_parametrization.to_dict()
         except Exception as e:
             raise Exception('Missing implementation of to_dict() in parametrization of type ' + type(self.rate_parametrization).__name__)
-        return {'obj_id': self.obj_id, 'refdate': self.refdate, 'rate_parametrization': self.rate_parametrization}
+        return {'obj_id': self.obj_id, 'refdate': self.refdate, 'rate_parametrization': parametrization}
 
     def value(self, refdate: Union[date, datetime], d: Union[date, datetime])->float:
         """Return discount factor for a given date
@@ -412,6 +412,19 @@ class DiscountCurveParametrized(interfaces.FactoryObject):
             raise Exception('The given reference date is before the curves reference date.')
         yf = self._dc.yf(refdate, d)
         return self.rate_parametrization(yf)
+
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None, refdate: Union[datetime, date]=None, 
+                       parametrization_type = NelsonSiegel)->list:
+        if seed is not None:
+            np.random.seed(seed)
+        if refdate is None:
+            refdate = datetime.now()
+        parametrizations = parametrization_type._create_sample(n_samples)
+        result = []
+        for i,p in enumerate(parametrizations):
+            result.append(DiscountCurveParametrized('DCP_'+str(i), refdate, p))
+        return result
 
     def __mul__(self, other):
         return DiscountCurveComposition(self, other, 0.0)
