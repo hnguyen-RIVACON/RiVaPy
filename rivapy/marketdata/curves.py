@@ -248,6 +248,15 @@ class ConstantRate(interfaces.FactoryObject):
     def _to_dict(self) -> dict:
         return {'rate': self.rate}
 
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None):
+        if seed is not None:
+            np.random.seed(seed)
+        result = []
+        for i in range(n_samples):
+            result.append(ConstantRate(rate = np.random.uniform(-0.005, 0.1)))
+        return result       
+    
     def __call__(self, t: float):
         return self.rate
 
@@ -265,6 +274,17 @@ class LinearRate(interfaces.FactoryObject):
         self.max_maturity = max_maturity
         self._coeff = (self.longterm_rate-self.shortterm_rate)/(self.max_maturity)
     
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None):
+        if seed is not None:
+            np.random.seed(seed)
+        result = []
+        for i in range(n_samples):
+            shortterm_rate = np.random.uniform(-0.005, 0.07)
+            longterm_rate = shortterm_rate + np.random.uniform(0.0025, 0.09)
+            result.append(LinearRate(shortterm_rate=shortterm_rate,longterm_rate=longterm_rate))
+        return result       
+        
     def _to_dict(self) -> dict:
         return {'shortterm_rate': self.shortterm_rate,
                 'longterm_rate': self.longterm_rate,

@@ -461,6 +461,8 @@ def _add_to_factory(cls):
 
 _add_to_factory(NelsonSiegel)
 _add_to_factory(NelsonSiegelSvensson)
+_add_to_factory(ConstantRate)
+_add_to_factory(LinearRate)
 _add_to_factory(DiscountCurveParametrized)
 
 if __name__=='__main__':
