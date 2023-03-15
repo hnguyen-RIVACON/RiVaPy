@@ -56,13 +56,13 @@ class Issuer(interfaces.FactoryObject):
                  name: str,
                  rating: _Union[Rating, str],
                  esg_rating: _Union[ESGRating, str],
-                 country: str,
+                 country: _Union[Country, str],
                  sector: Sector):
         self.__obj_id = obj_id
         self.__name = name
         self.__rating = Rating.to_string(rating)
         self.__esg_rating = ESGRating.to_string(esg_rating)
-        self.__country = country
+        self.__country = Country.to_string(country)
         self.__sector = Sector.to_string(sector)
 
     @staticmethod
