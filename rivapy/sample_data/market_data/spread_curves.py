@@ -42,6 +42,26 @@ class SpreadCurveCollection(FactoryObject):
                     country_curves: Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]],
                     sec_level_spreads: Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]]
                     ):
+        """Parametrization for a collection of spreadcurves. The spreadcurve for a given bond is created 
+        by a linear combination of different spreadcurves that belong to certain bond features
+
+            - For a each rating :math:`r^{\\star}` (issuer rating) a spreadcurve :math:`S_{r^\\star}` 
+            - For each currency :math:`c^{\\star}` a spreadcurve  :math:`S_{c^\\star}`
+            - For each ESG rating 
+            - Sector
+            - Country
+            - Securitization Level
+
+        Args:
+            ref_date (dt.datetime): _description_
+            rating_curve (Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]): _description_
+            currency_spread (Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]]): _description_
+            esg_spreads (Dict[str, float]): _description_
+            rating_weights (Dict[str, float]): _description_
+            sector_spreads (Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]]): _description_
+            country_curves (Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]]): _description_
+            sec_level_spreads (Dict[str, Tuple[Union[FactoryObject, dict, float], Union[FactoryObject, dict, float]]]): _description_
+        """
         self.ref_date = ref_date
         self.rating_curve = [SpreadCurveCollection._create_curve_or_float(rating_curve[0]), SpreadCurveCollection._create_curve_or_float(rating_curve[1])]
         self.currency_spread = { k:SpreadCurveCollection._create_curve_or_float(v) for k,v in currency_spread.items() }
