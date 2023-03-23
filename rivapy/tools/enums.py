@@ -32,6 +32,33 @@ class _MyEnum(_Enum):
         if isinstance(value, cls):
             return value.value
         raise Exception('Given value ' + str(value) + ' does not belong to enum ' + cls.__name__)
+    
+class _MyIntEnum(_Enum):
+    @classmethod
+    def has_value(cls, value):
+        return value in cls._value2member_map_
+
+    @classmethod
+    def to_string(cls, value)->str:
+        """Checks if given enum class contains the value and raises exception if not. If value is str 
+
+        Args:
+            enum (_type_): _description_
+            value (_type_): _description_
+
+        Returns:
+            str: _description_
+        """
+        def has_value(cls, value):
+            return value in cls._value2member_map_
+        if isinstance(value, str):
+            cls[value] #check if the string exists as key
+            return value
+        elif isinstance(value, int):
+            return cls._value2member_map_[value].name
+        if isinstance(value, cls):
+            return value.name
+        raise Exception('Given value ' + str(value) + ' does not belong to enum ' + cls.__name__)
 
 if _pyvacon_available:
     from pyvacon.finance.definition import DayCounter as _DayCounter
@@ -188,10 +215,14 @@ class Sector(_MyEnum):
     UTILITIES = 'Utilities'
 
 @_unique
-class ESGRating(_MyEnum):
+class ESGRating(_MyEnum): # see MSCI ESG ratings
+    AAA = 'AAA'
+    AA = 'AA'
     A = 'A'
+    BBB = 'BBB'
+    BB = 'BB'
     B = 'B'
-    C = 'C'
+    CCC = 'CCC'
 
 @_unique
 class Rating(_MyEnum):
@@ -413,7 +444,12 @@ class Currency(_MyEnum):
 
 class Country(_MyEnum):
     DE = 'DE'
-    US = 'US' 
+    FR = 'FR'
+    CA = 'CA'
+    US = 'US'
+    GB = 'GB'
+    JP = 'JP'
+    CN = 'CN'
        
 
     

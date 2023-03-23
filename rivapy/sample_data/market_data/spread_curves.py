@@ -1,6 +1,6 @@
 import numpy as np
 import datetime as dt
-from typing import Union, Tuple, Dict
+from typing import Union, Tuple, Dict, List
 from rivapy.tools.interfaces import FactoryObject
 from rivapy.tools.enums import Currency, ESGRating, Rating, Sector, Country, SecuritizationLevel
 from rivapy.marketdata import DiscountCurveParametrized, NelsonSiegel, LinearRate, ConstantRate
@@ -9,6 +9,31 @@ from rivapy.instruments.components import Issuer
 from rivapy.instruments import PlainVanillaCouponBondSpecification
 from rivapy.sample_data._logger import logger
 
+class RatingDependentCurve:
+    def __init__(self, curve_high_rating, curve_offset, curve_weights):
+        self.curve_high_rating = curve_high_rating
+        self.curve_offset = curve_offset
+        self.curve_weights = {k.value: curve_weights[i] for i,k in enumerate(Rating)}
+
+    def get_curve(self, rating: Union[str, Rating]):
+        return self.curve_high_rating + self.curve_weights[Rating.to_string(rating)]*self.curve_offset
+    
+class CategoryDependentCurve:
+    def __init__(self, curves: List[RatingDependentCurve], weights: np.ndarray, categories: list):
+        if len(curves) != weights.shape[1]:
+            raise Exception("Number of curves must equal number of weight columns!")
+        if len(categories) != weights.shape[0]:
+            raise Exception("Number of categories must equal number of weight rows!")
+        self.curves = curves
+        self.categories = categories
+        self.curve_weights = {categories[i]: weights[i] for i in range(len(categories))}
+
+    def get_curve(self, rating: Union[str, Rating], category: str):
+        weights = self.curve_weights[category]
+        result = weights[0]*self.curves[0].get_curve(rating)
+        for i in range(1,len(self.curves)):
+            result = result + weights[i]*self.curves[i].get_curve(rating)
+        return result
 class SpreadCurveCollection(FactoryObject):
 
     @staticmethod
@@ -99,7 +124,7 @@ class SpreadCurveCollection(FactoryObject):
 
 
 class SpreadCurveSampler:
-    def __init__(self):
+    def __init__(self, sector_weights=None, country_weights=None):
         """This class samples spreadcurves used to price bonds. It creates different curves according to
             
             * issuer rating (for all ratings defined in :class:`rivapy.tools.enums.Rating`)
@@ -121,7 +146,8 @@ class SpreadCurveSampler:
             We create two Nelson-Siegel parameterized curves by sampling the Nelson-Siegel parameters
              
         """
-        pass
+        self.sector_weights = sector_weights
+        self.country_weights = country_weights
     
     def sample(self, ref_date: dt.datetime)->dict:
         min_params = {'min_short_term_rate': -0.01, 
@@ -224,21 +250,39 @@ class SpreadCurveSampler:
         
     def _sample_sector_spreads(self):
         result = {}
-        for s in Sector:
-            s_low = np.random.uniform(low=0.001, high=0.0025)
-            result[s.value] = (s_low, s_low+np.random.uniform(low=0.001, high=0.0025))
+        if self.sector_weights is None:
+            for s in Sector:
+                s_low = np.random.uniform(low=0.001, high=0.0025)
+                result[s.value] = (s_low, s_low+np.random.uniform(low=0.001, high=0.0025))
+        else:
+            s_low = np.random.uniform(low=0.0, high=0.01, size=(self.sector_weights.shape[1]))
+            s_high = s_low + np.random.uniform(low=0.1, high=0.2, size=(self.sector_weights.shape[1]))
+            s_low = self.sector_weights.dot(s_low)
+            s_high = self.sector_weights.dot(s_high)
+            for i,s in enumerate(Sector):
+                result[s.value] = (s_low[i], s_high[i])
         self.sector_spreads = result
-        
+
     def _sample_country_curves(self, ref_date):
         self.country_curves = {}
-        for c in Country:
-            shortterm_rate = np.random.uniform(low=0.0, high=0.02)
-            longterm_rate = shortterm_rate + np.random.uniform(low=-0.005, high=0.005)
-            lower_curve = DiscountCurveParametrized('', ref_date, LinearRate(shortterm_rate, longterm_rate))
-            self.country_curves[c.value] = (lower_curve, lower_curve + DiscountCurveParametrized('', ref_date,
-                                                                    ConstantRate(np.random.uniform(0.05, 0.15))
-                                                                                       )
-                                  )
+        if self.country_weights is None:
+            for c in Country:
+                shortterm_rate = np.random.uniform(low=0.0, high=0.02)
+                longterm_rate = shortterm_rate + np.random.uniform(low=-0.005, high=0.005)
+                lower_curve = DiscountCurveParametrized('', ref_date, LinearRate(shortterm_rate, longterm_rate))
+                self.country_curves[c.value] = (lower_curve, lower_curve + DiscountCurveParametrized('', ref_date,
+                                                                        ConstantRate(np.random.uniform(0.05, 0.15))))
+        else:
+            shortterm_rate = np.random.uniform(low=0.0, high=0.02, size=self.country_weights.shape[1])
+            longterm_rate = shortterm_rate + np.random.uniform(low=-0.005, high=0.005, size=self.country_weights.shape[1])
+            shortterm_rate = self.country_weights.dot(shortterm_rate)
+            longterm_rate = self.country_weights.dot(longterm_rate)
+            rating_offset = np.random.uniform(low=0.1, high=0.2, size=self.country_weights.shape[1])
+            rating_offset = self.country_weights.dot(rating_offset)
+            for i,c in enumerate(Country):
+                lower_curve = DiscountCurveParametrized('', ref_date, LinearRate(shortterm_rate[i], longterm_rate[i]))
+                self.country_curves[c.value] = (lower_curve, lower_curve + DiscountCurveParametrized('', ref_date,
+                                                                        ConstantRate(rating_offset[i])))
     
     def _sample_sec_level_spreads(self):
         result = {}
@@ -263,6 +307,7 @@ class SpreadCurveSampler:
         
     def get_curve(self, issuer: Issuer, bond: PlainVanillaCouponBondSpecification):
         logger.info('computing curve for issuer ' + issuer.name + ' and bond ' + bond.obj_id)
+        return self._get_curve(issuer.rating, issuer.country, issuer.esg_rating, issuer.sector, bond.currency, bond.securitization_level)
         rating_weight = self.rating_weights[issuer.rating]
         w1 = 1.0-rating_weight
         w2 = rating_weight
@@ -272,6 +317,22 @@ class SpreadCurveSampler:
         sector_spread = w1*self.sector_spreads[issuer.sector][0] + w2*self.sector_spreads[issuer.sector][1]
         currency_spread = w1*self.currency_spread[bond.currency][0] + w2*self.currency_spread[bond.currency][1]
         securitization_spread = w1*self.securitization_spreads[bond.securitization_level][0] + w2* self.securitization_spreads[bond.securitization_level][1]
+        curve = 0.5*rating_curve + 0.5*(0.3*country_spread + 0.3*securitization_spread 
+                        + 0.2*esg_spread + 0.1*sector_spread+0.1*currency_spread)
+        #curve = 0.5*rating_curve + 0.5*esg_spread#(0.3*country_spread + 0.3*securitization_spread 
+        #                #+ 0.2*esg_spread + 0.1*sector_spread+0.1*currency_spread)
+        return curve
+    
+    def _get_curve(self, rating: str, country:str, esg_rating: str,  sector: str, currency: str, securitization_level: str):
+        rating_weight = self.rating_weights[rating]
+        w1 = 1.0-rating_weight
+        w2 = rating_weight
+        rating_curve = w1*self.rating_curve[0] + w2*self.rating_curve[1]
+        country_spread = w1*self.country_curves[country][0] + w2*self.country_curves[country][1]
+        esg_spread = w1*self.esg_rating_spread[esg_rating][0] +  w2*self.esg_rating_spread[esg_rating][1]
+        sector_spread = w1*self.sector_spreads[sector][0] + w2*self.sector_spreads[sector][1]
+        currency_spread = w1*self.currency_spread[currency][0] + w2*self.currency_spread[currency][1]
+        securitization_spread = w1*self.securitization_spreads[securitization_level][0] + w2* self.securitization_spreads[securitization_level][1]
         curve = 0.5*rating_curve + 0.5*(0.3*country_spread + 0.3*securitization_spread 
                         + 0.2*esg_spread + 0.1*sector_spread+0.1*currency_spread)
         #curve = 0.5*rating_curve + 0.5*esg_spread#(0.3*country_spread + 0.3*securitization_spread 
