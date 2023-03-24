@@ -21,7 +21,7 @@ else:
     class ExtrapolationType:
         NONE = 'NONE'
         
-
+print('hello world')
 class SecuritizationLevel:
     NONE = 'NONE'
     COLLATERALIZED = 'COLLATERALIZED' #,,,'','SUBORDINATED','MEZZANINE','EQUITY']
