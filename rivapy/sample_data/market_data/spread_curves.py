@@ -185,6 +185,17 @@ class SpreadCurveSampler:
                   'rating_weights': self.rating_weights, 'sector_spreads': self.sector_spreads, 'country_curves': self.country_curves,
                   'securitization_spreads': self.securitization_spreads}
 
+    def _get_num_params(self, num_currencies):
+        result = 4 #curve_best_rating
+        result += 4 # curve_worst_rating
+        result += 2*num_currencies #_sample_currency_spread
+        result += len(ESGRating) #_sample_esg_rating_spreads
+        result += len(Rating)-2 #_sample_rating_weights
+        result +=  2*self.sector_weights.shape[1]#_sample_sector_spreads
+        result += 3*self.country_weights.shape[1]  #_sample_country_curves
+        result += 3#_sample_sec_level_spreads
+        return result
+
     def sample_new(self, ref_date: dt.datetime)->SpreadCurveCollection:
         min_params = {'min_short_term_rate': -0.01, 
                           'max_short_term_rate': 0.02, 
@@ -217,8 +228,9 @@ class SpreadCurveSampler:
         self._sample_sector_spreads()
         self._sample_country_curves(ref_date=ref_date)
         self._sample_sec_level_spreads()
-        return SpreadCurveCollection(ref_date, self.rating_curve, self.currency_spread, self.esg_rating_spread, self.rating_weights, 
+        self.spread_curve_collection = SpreadCurveCollection(ref_date, self.rating_curve, self.currency_spread, self.esg_rating_spread, self.rating_weights, 
                                      self.sector_spreads, self.country_curves, self.securitization_spreads )
+        return self.spread_curve_collection
   
     def _sample_currency_spread(self):
         self.currency_spread = {}
@@ -307,6 +319,7 @@ class SpreadCurveSampler:
         
     def get_curve(self, issuer: Issuer, bond: PlainVanillaCouponBondSpecification):
         logger.info('computing curve for issuer ' + issuer.name + ' and bond ' + bond.obj_id)
+        return self.spread_curve_collection.get_curve(issuer, bond)
         return self._get_curve(issuer.rating, issuer.country, issuer.esg_rating, issuer.sector, bond.currency, bond.securitization_level)
         rating_weight = self.rating_weights[issuer.rating]
         w1 = 1.0-rating_weight

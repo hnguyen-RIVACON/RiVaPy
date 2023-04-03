@@ -153,25 +153,24 @@ class CreditDefaultData2:
         economic_score = np.random.uniform(0, 0.5, size=n_years)
         economic_score[-1] = 1.0
         x = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
-                          columns=['age','income','savings','credit_amount_perc' , 'economic_factor'])
+                          columns=['age','income','savings','credit_debt_ratio' , 'economic_factor'])
     
         for y in range(n_years):
-            x['economic_factor'][y*n_data_per_year:(y+1)*n_data_per_year] = economic_score
+            start = y*n_data_per_year
+            end = start + n_data_per_year
+            x['economic_factor'][start:end] = economic_score[y]
             x_ = np.random.multivariate_normal(mean=mean, cov=cov, size=n_data_per_year)
-            x_ = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
-                          columns=['age','income','savings','credit_amount_perc'])
-        
+            x_ = pd.DataFrame(x_, 
+                          columns=['age','income','savings','credit_debt_ratio',])
             beta_params={'age': {'a': 2.0,'b': 5.0}, 
                         'income':{'a':2.0, 'b': 2.0}, 
                         'savings':{'a':5.0,'b':1.0}, 
-                        'credit_amount_perc':{'a':0.5,'b': 0.5}}
+                        'credit_debt_ratio':{'a':0.5,'b': 0.5}}
             for c in beta_params.keys():
-                x[c][y*n_data_per_year:(y+1)*n_data_per_year] = scipy.stats.beta.ppf(scipy.stats.norm.cdf(x_[c].values), **beta_params[c])
-        result = x
+                x[c][start:end] = scipy.stats.beta.ppf(scipy.stats.norm.cdf(x_[c].values), **beta_params[c])
         df = pd.DataFrame(x)
         
-        
-        default_prob = CreditDefaultData._predict(df)
+        default_prob = CreditDefaultData2._predict(df.values)
         df['default_prob'] = default_prob
         tmp = np.random.uniform(low=0.0,high=1.0, size=n_years*n_data_per_year)
         defaulted = np.zeros((n_years*n_data_per_year,))
@@ -181,19 +180,20 @@ class CreditDefaultData2:
     
     
     @staticmethod
-    def _predict(df: pd.DataFrame)->np.ndarray:
+    def _predict(X: np.ndarray)->np.ndarray:
         """This method computes the pd and is called by the method sample.
 
         Args:
-            df (pd.DataFrame): Pandas DataFrame as constructed within the sample method.
+            df (np.ndarray): 
 
         Returns:
             np.ndarray: Vector of default probabilities.
         """
-        beta0 = [0.5, 1.1, 0.7]
-        tmp =  (0.5-df['age'])**2 - 0.3*df['credit_amount_perc']#
-        x0 = 5.0*df['economic_facor']
-        x1 = 1.5*(df['income'])**2
-        x2 = 1.5*df['savings']
-        x3 = df['regime']
+        x0 = X[:,0]
+        tmp =  (0.5-x0)**2 - 0.3*X[:, 3]#
+        tmp =  (1.0-x0)*(x0) - 0.3*X[:, 3]#
+        x0 = 5.0*tmp
+        x1 = 1.5*(X[:, 1])**2
+        x2 = 1.5*X[:, 2]
+        x3 = 1.0-X[:, 4]
         return 1.0/(1.0+np.exp(2.0*(x0+x1+x2+x3)))
