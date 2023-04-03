@@ -149,7 +149,7 @@ class DiscountCurve:
 
 class NelsonSiegel(interfaces.FactoryObject):
     def __init__(self, beta0: float, beta1: float, 
-                            beta2: float, tau: float):
+                        beta2: float, tau: float):
         """Nelson-Siegel parametrization for rates and yields, see :footcite:t:`Nelson1987`.
 
         This parametrization is mostly used to parametrize rate curves and can be used in conjunction with :class:`rivapy.marketdata.DiscountCurveParametrized`. It is defined by
@@ -298,17 +298,18 @@ class LinearRate(interfaces.FactoryObject):
 
 class NelsonSiegelSvensson(NelsonSiegel):
     def __init__(self, beta0: float, beta1: float, 
-                            beta2: float, beta3: float, tau: float):
+                            beta2: float, beta3: float, tau: float, tau2: float):
         super().__init__(beta0, beta1, beta2, tau)
         self.beta3 = beta3
+        self.tau2 = tau2
 
     def _to_dict(self) -> dict:
         tmp = super()._to_dict()
-        tmp.update({'beta3': self.beta3})
+        tmp.update({'beta3': self.beta3, 'tau2': self.tau2})
         return tmp
 
     def __call__(self, t: float):
-        return NelsonSiegelSvensson.compute(self.beta0, self.beta1, self.beta2, self.beta3, self.tau, t)
+        return NelsonSiegelSvensson.compute(self.beta0, self.beta1, self.beta2, self.beta3, self.tau, self.tau2, t)
 
     @staticmethod
     def compute(beta0, beta1, beta2, beta3, tau, tau2, T):
