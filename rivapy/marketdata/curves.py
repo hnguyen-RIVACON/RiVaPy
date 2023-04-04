@@ -10,6 +10,13 @@ import rivapy.tools.interfaces as interfaces
 import scipy.optimize
 import pandas as pd
 import numpy as np
+try:
+    import tensorflow as tf
+    has_tf = True
+except ImportError:
+    has_tf = False
+
+
 
 from rivapy.tools.enums import DayCounterType, InterpolationType, ExtrapolationType
 from rivapy.tools.datetools import DayCounter
@@ -232,6 +239,24 @@ class NelsonSiegel(interfaces.FactoryObject):
             result.append(NelsonSiegel(beta0, beta1, beta2, tau))
         return result
     
+    if has_tf:
+        @staticmethod
+        def compute_tf(beta0: tf.Tensor, beta1: tf.Tensor,
+                                beta2: tf.Tensor, tau: tf.Tensor, T: tf.Tensor)->tf.Tensor:
+            """_summary_
+
+            Args:
+                beta0 (float): longrun
+                beta1 (float): beta0 + beta1 = shortrun
+                beta2 (float): hump or through
+                tau (float):locaton of hump
+                T (float): _description_
+
+            Returns:
+                float: _description_
+            """
+            t = tf.maximum(T, 1e-4)/tau
+            return beta0 + beta1*(1.0-tf.exp(-t))/t + beta2*((1-tf.exp(-t))/t - tf.exp(-(t)))
 
 
 class ConstantRate(interfaces.FactoryObject):
