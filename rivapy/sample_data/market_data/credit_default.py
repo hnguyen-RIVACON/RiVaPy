@@ -153,7 +153,7 @@ class CreditDefaultData2:
         economic_score = np.random.uniform(0, 0.5, size=n_years)
         economic_score[-1] = 1.0
         x = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
-                          columns=['age','income','savings','credit_debt_ratio' , 'economic_factor'])
+                          columns=['age','income','savings','credit_income_ratio' , 'economic_factor'])
     
         for y in range(n_years):
             start = y*n_data_per_year
@@ -161,11 +161,11 @@ class CreditDefaultData2:
             x['economic_factor'][start:end] = economic_score[y]
             x_ = np.random.multivariate_normal(mean=mean, cov=cov, size=n_data_per_year)
             x_ = pd.DataFrame(x_, 
-                          columns=['age','income','savings','credit_debt_ratio',])
+                          columns=['age','income','savings','credit_income_ratio',])
             beta_params={'age': {'a': 2.0,'b': 5.0}, 
                         'income':{'a':2.0, 'b': 2.0}, 
                         'savings':{'a':5.0,'b':1.0}, 
-                        'credit_debt_ratio':{'a':0.5,'b': 0.5}}
+                        'credit_income_ratio':{'a':0.5,'b': 0.5}}
             for c in beta_params.keys():
                 x[c][start:end] = scipy.stats.beta.ppf(scipy.stats.norm.cdf(x_[c].values), **beta_params[c])
         df = pd.DataFrame(x)
