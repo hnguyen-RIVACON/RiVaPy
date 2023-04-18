@@ -58,6 +58,7 @@ class CreditDefaultData:
         for c in x_.columns:
             x_[c] = scipy.stats.beta.ppf(scipy.stats.norm.cdf(x_[c].values), **beta_params[c])
         result = x_
+
         #result = {}
         #result['age'] = np.random.beta(a=2.0,b=5.0, size=n_data)
         #result['income'] = np.random.beta(a=2.0, b=2.0, size=n_data)
