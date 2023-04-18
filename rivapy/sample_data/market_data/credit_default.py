@@ -1,7 +1,15 @@
+from enum import IntEnum
 import numpy as np
 import scipy
 from scipy import stats
 import pandas as pd
+
+class Features(IntEnum):
+    Age = 0
+    Income = 1
+    Savings = 2
+    Credit_income_ratio = 3
+    Economimc_factor = 4
 
 class CreditDefaultData:
     @staticmethod
@@ -105,6 +113,7 @@ class CreditDefaultData:
     
 
 class CreditDefaultData2:
+        
     @staticmethod
     def sample(n_years: int, n_data_per_year: int, seed: int=None,
                 cov:np.ndarray=None)->pd.DataFrame: 
@@ -189,11 +198,10 @@ class CreditDefaultData2:
         Returns:
             np.ndarray: Vector of default probabilities.
         """
-        x0 = X[:,0]
-        tmp =  (0.5-x0)**2 - 0.3*X[:, 3]#
-        tmp =  (1.0-x0)*(x0) - 0.3*X[:, 3]#
-        x0 = 5.0*tmp
-        x1 = 1.5*(X[:, 1])**2
-        x2 = 1.5*X[:, 2]
-        x3 = 1.0-X[:, 4]
-        return 1.0/(1.0+np.exp(2.0*(x0+x1+x2+x3)))
+        age = X[:,Features.Age]
+        age = 5.0*(1.0-age)*age
+        credit_income_ratio = -5.0*0.3*X[:, Features.Credit_income_ratio]
+        x1 = 1.5*(X[:, Features.Income])**2
+        x2 = 1.5*X[:, Features.Savings]
+        x3 = 1.0-X[:, Features.Economimc_factor]
+        return 1.0/(1.0+np.exp(2.0*(age+credit_income_ratio + x1+x2+x3)))
