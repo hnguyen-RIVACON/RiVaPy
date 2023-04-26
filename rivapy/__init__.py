@@ -16,6 +16,7 @@ from rivapy.tools import enums
 import rivapy.instruments as instruments
 import rivapy.pricing as pricing
 import rivapy.marketdata as marketdata
+import rivapy.models as models
 #import rivapy
 
 
