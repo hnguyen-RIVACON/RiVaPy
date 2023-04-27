@@ -1,6 +1,7 @@
 from typing import Union, Callable
 import numpy as np
 from rivapy.tools.interfaces import FactoryObject
+from rivapy.models.ornstein_uhlenbeck import OrnsteinUhlenbeck
 
 class LuciaSchwartz(FactoryObject):
 
@@ -14,14 +15,16 @@ class LuciaSchwartz(FactoryObject):
             return result
 
     def __init__(self, 
-                kappa: Union[float, Callable], 
-                sigma1: Union[float, Callable], 
-                mu: Union[float, Callable],
-                sigma2:Union[float, Callable],
+                rho: float,
+                kappa: Union[float, Callable]=None, 
+                sigma1: Union[float, Callable]=None, 
+                mu: Union[float, Callable]=None,
+                sigma2:Union[float, Callable]=None,
+                
                 f: Callable[[Union[float, np.ndarray]],Union[float, np.ndarray]]=None):
         """Lucia Schwartz two factor model.
 
-        The model is defined by
+        The model may be used to simulate spot/forward prices via
 
         .. math:: 
 
@@ -34,42 +37,39 @@ class LuciaSchwartz(FactoryObject):
         where :math:`f(t)` is a deterministic function, :math:`\\kappa` the speed of mean reversion for 
         the first process that may be interpreted as the long-term factor and :math:`\\sigma_1` the respective volatility.
         The second factor :math:`X_2` may be interpreted as a short-term factor that is influenced by  :math:`W_2`
-        and has drift :math:`\\mu`. :math:`X_1` and :math:`X_2` may be correlated with correlation :math:`\\rho`.
+        and has drift :math:`\\mu`. :math:`X_1` and :math:`X_2` may be correlated with correlation :math:`\\rho`. Note that this class just simulates 
+
         
         Args:
             kappa (Union[float, Callable]): The speed of mean reversion for the first factor :math:`X_1`. Can be either constant or time dependent.
             sigma1 (Union[float, Callable]): The volatility of the first factor :math:`X_1`. Can be either constant or time dependent.
             mu (Union[float, Callable]): The drift of teh second factor :math:`X_2`. Can be either constant or time dependent.
             sigma2 (Union[float, Callable]): The volatility of the second factor :math:`X_2`. Can be either constant or time dependent.
+            rho (float): Correlation between X1 and X2.
             f (Union[float, Callable], optional): Deterministic function of time. Defaults to 0.
         """
-        self.kappa = kappa
-        self.sigma1 = sigma1
+        self.X1 = OrnsteinUhlenbeck(kappa, sigma1, 0.0)
         self.mu = mu
         self.sigma2 = sigma2
-        self.f = f
+        self.rho = rho
         self._timegrid = None
+        self.f = f
 
     def _to_dict(self) -> dict:
-        return {'kappa': self.kappa, 'sigma1': self.sigma1,
+        return {'kappa': self.X1.speed_of_mean_reversion, 'sigma1': self.X1.volatility,
                 'mu': self.mu, 'sigma2': self.sigma2, 'f': self.f}
 
     def _set_timegrid(self, timegrid):
-        self._timegrid = np.copy(timegrid)
-        self._delta_t = self._timegrid[1:]-self._timegrid[:-1]
-        self._sqrt_delta_t = np.sqrt(self._delta_t)
-
-        self._kappa_grid = LuciaSchwartz._eval_grid(self.kappa, timegrid)
-        self._sigma1_grid = LuciaSchwartz._eval_grid(self.sigma1, timegrid)
+        
         self._mu_grid = LuciaSchwartz._eval_grid(self.mu, timegrid)
         self._sigma2_grid = LuciaSchwartz._eval_grid(self.sigma2, timegrid)
-        self._mean_reversion_level_grid = LuciaSchwartz._eval_grid(self.mean_reversion_level, timegrid)
-        
+        self._f_grid = LuciaSchwartz._eval_grid(self.f, timegrid)
+
     def rnd_shape(self, n_sims: int, n_timepoints: int)->tuple:
         return (n_timepoints-1, n_sims, 2)
 
 
-    def simulate(self, timegrid, start_value, rnd, S_only):
+    def simulate(self, timegrid, start_value, rnd):
         """_summary_
 
         Args:
@@ -81,13 +81,18 @@ class LuciaSchwartz(FactoryObject):
             _type_: _description_
         """
         self._set_timegrid(timegrid)
-        result = np.empty((self._timegrid.shape[0], rnd.shape[1], 2))
-        result[0,:] = start_value
-
-        for i in range(self._timegrid.shape[0]-1):
-            result[i+1,:] = (result[i, :] * np.exp(-self._speed_of_mean_reversion_grid[i]*self._delta_t[i])
-                        + self._mean_reversion_level_grid[i]* (1 - np.exp(-self._speed_of_mean_reversion_grid[i]*self._delta_t[i])) 
-                        + self._volatility_grid[i]* np.sqrt((1 - np.exp(-2*self._speed_of_mean_reversion_grid[i]*self._delta_t[i])) / (2*self._speed_of_mean_reversion_grid[i])) * rnd[i,:]
-                        )
-        return result
+        rnd_ = np.copy(rnd)
+        rnd_[:,:,1] = self.rho*rnd[:,:,0] + np.sqrt(1.0-self.rho**2)*rnd[:,:,1]
+        X2 = np.empty((timegrid.shape[0],rnd.shape[1],))
+        if len(start_value.shape)==2:
+            start_X1 = start_value[:,0]
+            X2[0,:] = start_value[:,1]
+        else:
+            start_X1 = start_value[0]
+            X2[0,:] = start_value[1]
+        X1 = self.X1.simulate(timegrid, start_value=start_X1, rnd=rnd_[:,:,0])
+       
+        for i in range(timegrid.shape[0]-1):
+            X2[i+1,:] = X2[i,:]*self.X1._delta_t[i] + self._sigma2_grid[i]*rnd[i,:,1]*self.X1._sqrt_delta_t[i]
+        return  X1 + X2  + self._f_grid[:,np.newaxis]
 
