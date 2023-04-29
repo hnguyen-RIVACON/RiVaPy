@@ -1,5 +1,6 @@
 from typing import Union, Callable, Tuple, List
 import numpy as np
+import scipy
 from rivapy.tools.interfaces import FactoryObject
 from rivapy.models.ornstein_uhlenbeck import OrnsteinUhlenbeck
 
@@ -93,16 +94,41 @@ class LuciaSchwartz(FactoryObject):
             return self.X1.compute_expected_value(x0[0], T) + x0[1]+self.mu*T
         return self.X1.compute_expected_value(x0[:,0], T) + x0[:,1]+self.mu*T
 
-    def _compute_fwd_value(self, forward: Tuple[float,float], timegrid: np.ndarray)->float:
-        tmp = np.where(timegrid>=forward[0])
-        if tmp.shape[0]==0:
-            raise ValueError("Forward start time not in timegrid.")
-        indices_start = np.where(timegrid>=forward[0])[0]
-        indices_end = np.where(timegrid<=forward[1])[0]
+    def compute_fwd_value(self, x0: np.ndarray, T1:float, T2:float, 
+                           qm: Callable[[Callable,float],float]=None,
+                           **qm_kwargs)->float:
+        """Compute the forward value for a forward (swap) with continuos delivery between two time points.
         
-        
+        In more detail, the forward value is computed as
 
-    def simulate(self, timegrid, start_value, rnd, forwards:List[Tuple[float,float]]=None):
+        .. math::
+
+            F(t,t_1,t_2) = \\frac{E_t[\\int_{T_1}^{T_2} F(t,s) ds]}{T_2-T_1}
+
+        where :math:`F(t,s)` is the expected spot price at time :math:`T`. The expectation is
+        taken under the risk neutral measure :math:`Q^M`.
+
+        Args:
+            T1 (float): Start point of period.
+            T2 (float): End point of period. If None, the expected value of the spot price :math:`F(t,T_1)` at T1 is returned.
+            qm (Callable[[Callable,float,float]], optional): Quadrature method used for the integral. If None, scipy.integrate.romberg will be used. Defaults to None.
+            **qm_kwargs: Keyword arguments for the quadrature method.
+
+        Returns:
+            float: Forward value.
+        """
+        if T2 is None:
+            return self.compute_expected_value(x0,T1)
+        if T2<=T1:
+            raise ValueError("T2 must be larger than T1.")
+        if qm is None:
+            qm = scipy.integrate.romberg
+        result = qm(lambda t: self.compute_expected_value(x0,t), T1, T2, **qm_kwargs)
+        return result/(T2-T1)
+
+    def simulate(self, timegrid, start_value, rnd, 
+                 forwards:List[Tuple[float,float]]=None,
+                 forward_start_values:np.ndarray=None,):
         """
         Simulates the model.
 
@@ -110,13 +136,15 @@ class LuciaSchwartz(FactoryObject):
             timegrid (np.ndarray): Timegrid for simulation.
             start_value (Union[float, np.ndarray]): Start value for simulation.
             rnd (np.ndarray): Random numbers for simulation.
-            forwards (np.ndarray, optional): Forwards for simulation. Defaults to None.
+            forwards (List[Tuple[float,float]], optional): Forwards for simulation. Defaults to None.
+            forward_start_values (np.ndarray, optional): Initial values for forwards. 
+                Defaults to None. If forwards is specified and this argument is None, 
+                the initial values will be computed with the method compute_fwd_value.
         """
         n_assets = 1
         if forwards is not None:
             n_assets = len(forwards)+1
-        result = np.full((timegrid.shape[0], rnd.shape[1], n_assets), np.NaN)
-        self._set_timegrid(timegrid)
+            self._set_timegrid(timegrid)
         rnd_ = np.copy(rnd)
         rnd_[:,:,1] = self.rho*rnd[:,:,0] + np.sqrt(1.0-self.rho**2)*rnd[:,:,1]
         X2 = np.empty((timegrid.shape[0],rnd.shape[1],))
@@ -127,8 +155,37 @@ class LuciaSchwartz(FactoryObject):
             start_X1 = start_value[0]
             X2[0,:] = start_value[1]
         X1 = self.X1.simulate(timegrid, start_value=start_X1, rnd=rnd_[:,:,0])
-       
-        for i in range(timegrid.shape[0]-1):
-            X2[i+1,:] = X2[i,:] + self._mu_grid[i]*self.X1._delta_t[i] + self._sigma2_grid[i]*rnd[i,:,1]*self.X1._sqrt_delta_t[i]
-        return  X1 #+ X2  + self._f_grid[:,np.newaxis]
+        tmp = self._mu_grid[:-1]*self.X1._delta_t
+        tmp2 =  self._sigma2_grid[:-1]*self.X1._sqrt_delta_t
+        X2[1:,:] = tmp[:,np.newaxis] + tmp2[:,np.newaxis]*rnd_[:,:,1]
+        X2 = X2.cumsum(axis=0)
+        #for i in range(timegrid.shape[0]-1):
+        #    X2[i+1,:] = X2[i,:] + self._mu_grid[i]*self.X1._delta_t[i] + self._sigma2_grid[i]*rnd[i,:,1]*self.X1._sqrt_delta_t[i]
+        if forwards is not None:
+            if forward_start_values is None:
+                forward_start_values = np.empty((len(forwards),))
+                for i in range(len(forwards)):
+                    forward_start_values[i] = self.compute_fwd_value(start_value, forwards[i][0], forwards[i][1])
+        
+            result = np.full((timegrid.shape[0], rnd.shape[1], n_assets), np.NaN)
+            result[:,:,0] = X1 + X2  + self._f_grid[:,np.newaxis]
+            dW1 = self.X1._volatility_grid[:1,np.newaxis]*rnd_[:,:,0]*self.X1._sqrt_delta_t[:,np.newaxis]
+            dW2 = self._sigma2_grid[:1,np.newaxis]*rnd_[:,:,0]*self.X1._sqrt_delta_t[:,np.newaxis] 
+            for fwd in range(len(forwards)):
+                tt_T2 = forwards[fwd][1]-timegrid
+                tt_T1 = forwards[fwd][0]-timegrid
+                kappa = self.X1._speed_of_mean_reversion_grid
+                tmp = -(np.exp(-kappa*tt_T2) - np.exp(-kappa*tt_T1))/(kappa*(forwards[fwd][1]-forwards[fwd][0]))           
+                result[0,:,fwd+1] = forward_start_values[fwd]
+                result[1:,:,fwd+1] = tmp[:1,np.newaxis]*dW1 + dW2
+                result[:,:,fwd+1] = result[:,:,fwd+1].cumsum(axis=0)
+        else:
+            return X1 + X2  + self._f_grid[:,np.newaxis]
+        return result
 
+if __name__=='__main__':
+    ls_model = LuciaSchwartz(rho=-.81, kappa = 0.077, sigma1 = 0.1, mu=-0.29, sigma2=0.1)
+    n_sims = 10_000
+    timegrid = np.linspace(0.0,1.0,365)
+    rnd = np.random.normal(size=ls_model.rnd_shape(n_sims, timegrid.shape[0]))
+    paths = ls_model.simulate(timegrid, start_value=np.array([0.0,0.0]), rnd=rnd, forwards=[(1.0,2.0)])
