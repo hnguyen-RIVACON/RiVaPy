@@ -144,7 +144,7 @@ class LuciaSchwartz(FactoryObject):
         n_assets = 1
         if forwards is not None:
             n_assets = len(forwards)+1
-            self._set_timegrid(timegrid)
+        self._set_timegrid(timegrid)
         rnd_ = np.copy(rnd)
         rnd_[:,:,1] = self.rho*rnd[:,:,0] + np.sqrt(1.0-self.rho**2)*rnd[:,:,1]
         X2 = np.empty((timegrid.shape[0],rnd.shape[1],))
