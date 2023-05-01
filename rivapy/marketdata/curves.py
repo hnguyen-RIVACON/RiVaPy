@@ -726,12 +726,12 @@ class PowerPriceForwardCurve:
         self.values = values
         # timegrid used to compute prices for a certain schedule
         self._tg = None
-        self._df = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, closed='left').to_pydatetime(), 
+        self._df = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, inclusive='left').to_pydatetime(), 
                                 'values': self.values}).set_index(['dates']).sort_index()
         
     def value(self, refdate: Union[date, datetime], schedule)->np.ndarray:
         if self._tg is None:
-            self._tg = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, closed='left').to_pydatetime(), 'values': self.values}).reset_index()
+            self._tg = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, inclusive='left').to_pydatetime(), 'values': self.values}).reset_index()
             if self._tg.shape[0] != self.values.shape[0]:
                 raise Exception('The number of dates (' + str(self._tg.shape[0])+') does not equal number of values (' + str(self.values.shape[0]) + ') in forward curve.')
         tg = self._tg[(self._tg.dates>=schedule.start)&(self._tg.dates<schedule.end)].set_index('dates')
