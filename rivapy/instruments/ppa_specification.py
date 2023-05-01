@@ -5,6 +5,7 @@ import pandas as pd
 import datetime as dt
 import rivapy.tools.interfaces as interfaces
 from rivapy.instruments.factory import create as _create
+from rivapy.tools.datetime_grid import DateTimeGrid
 
 
 class SimpleSchedule(interfaces.FactoryObject):
@@ -41,8 +42,6 @@ class SimpleSchedule(interfaces.FactoryObject):
 			>>> simple_schedule = SimpleSchedule(dt.datetime(2023,1,1), dt.datetime(2023,1,2,4,0,0), freq='1H', hours=[2,3], weekdays=[0])
 			>>> simple_schedule.get_schedule()
 			[datetime.datetime(2023, 1, 2, 2, 0), datetime.datetime(2023, 1, 2, 3, 0)]
-
-
 		"""
 		self.start = start
 		self.end = end
@@ -59,16 +58,16 @@ class SimpleSchedule(interfaces.FactoryObject):
 					'hours': self.hours, 'tz': self.tz
 		}
  
-	def get_schedule(self, refdate: dt.datetime = None)->List[dt.datetime]:
-		"""Return list of datetime values belonging to the schedule.
+	def get_schedule(self, refdate: dt.datetime = None)->np.ndarray:
+		"""Return vector of datetime values belonging to the schedule.
 
 		Args:
 			refdate (dt.datetime): All schedule dates are ignored before this reference dats. If None, all schedule dates are returned. Defaults to None.
 
 		Returns:
-			List[dt.datetime]: List of all datetimepoints of the schedule.
+			np.ndarray: Vector of all datetimepoints of the schedule.
 		"""
-		d_ = pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, closed='left').to_pydatetime()
+		d_ = pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, inclusive='left').to_pydatetime()
 		if self.weekdays is not None:
 			d_ = [d for d in d_ if d.weekday() in self.weekdays]
 		if self.hours is not None:
@@ -79,9 +78,11 @@ class SimpleSchedule(interfaces.FactoryObject):
 
 	def get_df(self)->pd.DataFrame:
 		if self._df is None:
-			self._df = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, closed='left').to_pydatetime()}).reset_index()
+			self._df = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, inclusive='left').to_pydatetime()}).reset_index()
 		return self._df
 
+	def applies(self, dates: DateTimeGrid, index: bool)->List[Union[bool, int]]:
+		dates.dates
 	def get_params(self)->dict:
 		"""Return all params as json serializable dictionary.
 

@@ -65,11 +65,12 @@ class BondBaseSpecification(interfaces.FactoryObject):
         if sec_levels is None:
             sec_levels = list(SecuritizationLevel)
         for _ in range(n_samples):
+            days = int(15.0*365.0*np.random.beta(2.0,2.0)) + 1
             issue_date = ref_date + timedelta(days=np.random.randint(low=-365, high=0))
             result.append(
                 {
                 'issue_date': issue_date,
-                'maturity_date': ref_date + timedelta(days=np.random.randint(low=30, high=10*365)),
+                'maturity_date': ref_date + timedelta(days=days),
                 'currency':np.random.choice(currencies),
                 'notional': np.random.choice([100.0, 1000.0, 10_000.0, 100_0000.0]),
                 'issuer': np.random.choice(issuers),
@@ -341,7 +342,7 @@ class PlainVanillaCouponBondSpecification(BondBaseSpecification):
                     currencies: _List[str]= None):
         specs = BondBaseSpecification._create_sample(**locals())
         result = []
-        coupons = np.arange(0.01, 0.09, 0.005)
+        coupons = np.arange(0.0, 0.09, 0.0025)
         for i, b in enumerate(specs):
             b['coupon_freq'] = np.random.choice(['3M', '6M', '9M', '1Y'], p=[0.1,0.4,0.1,0.4])
             issue_date = b['issue_date']

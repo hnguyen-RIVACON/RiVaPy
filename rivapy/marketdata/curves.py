@@ -10,6 +10,13 @@ import rivapy.tools.interfaces as interfaces
 import scipy.optimize
 import pandas as pd
 import numpy as np
+try:
+    import tensorflow as tf
+    has_tf = True
+except ImportError:
+    has_tf = False
+
+
 
 from rivapy.tools.enums import DayCounterType, InterpolationType, ExtrapolationType
 from rivapy.tools.datetools import DayCounter
@@ -149,7 +156,7 @@ class DiscountCurve:
 
 class NelsonSiegel(interfaces.FactoryObject):
     def __init__(self, beta0: float, beta1: float, 
-                            beta2: float, tau: float):
+                        beta2: float, tau: float):
         """Nelson-Siegel parametrization for rates and yields, see :footcite:t:`Nelson1987`.
 
         This parametrization is mostly used to parametrize rate curves and can be used in conjunction with :class:`rivapy.marketdata.DiscountCurveParametrized`. It is defined by
@@ -232,6 +239,24 @@ class NelsonSiegel(interfaces.FactoryObject):
             result.append(NelsonSiegel(beta0, beta1, beta2, tau))
         return result
     
+    if has_tf:
+        @staticmethod
+        def compute_tf(beta0: tf.Tensor, beta1: tf.Tensor,
+                                beta2: tf.Tensor, tau: tf.Tensor, T: tf.Tensor)->tf.Tensor:
+            """_summary_
+
+            Args:
+                beta0 (float): longrun
+                beta1 (float): beta0 + beta1 = shortrun
+                beta2 (float): hump or through
+                tau (float):locaton of hump
+                T (float): _description_
+
+            Returns:
+                float: _description_
+            """
+            t = tf.maximum(T, 1e-4)/tau
+            return beta0 + beta1*(1.0-tf.exp(-t))/t + beta2*((1-tf.exp(-t))/t - tf.exp(-(t)))
 
 
 class ConstantRate(interfaces.FactoryObject):
@@ -248,6 +273,15 @@ class ConstantRate(interfaces.FactoryObject):
     def _to_dict(self) -> dict:
         return {'rate': self.rate}
 
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None):
+        if seed is not None:
+            np.random.seed(seed)
+        result = []
+        for i in range(n_samples):
+            result.append(ConstantRate(rate = np.random.uniform(-0.005, 0.1)))
+        return result       
+    
     def __call__(self, t: float):
         return self.rate
 
@@ -265,6 +299,17 @@ class LinearRate(interfaces.FactoryObject):
         self.max_maturity = max_maturity
         self._coeff = (self.longterm_rate-self.shortterm_rate)/(self.max_maturity)
     
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None):
+        if seed is not None:
+            np.random.seed(seed)
+        result = []
+        for i in range(n_samples):
+            shortterm_rate = np.random.uniform(-0.005, 0.07)
+            longterm_rate = shortterm_rate + np.random.uniform(0.0025, 0.09)
+            result.append(LinearRate(shortterm_rate=shortterm_rate,longterm_rate=longterm_rate))
+        return result       
+        
     def _to_dict(self) -> dict:
         return {'shortterm_rate': self.shortterm_rate,
                 'longterm_rate': self.longterm_rate,
@@ -278,17 +323,18 @@ class LinearRate(interfaces.FactoryObject):
 
 class NelsonSiegelSvensson(NelsonSiegel):
     def __init__(self, beta0: float, beta1: float, 
-                            beta2: float, beta3: float, tau: float):
+                            beta2: float, beta3: float, tau: float, tau2: float):
         super().__init__(beta0, beta1, beta2, tau)
         self.beta3 = beta3
+        self.tau2 = tau2
 
     def _to_dict(self) -> dict:
         tmp = super()._to_dict()
-        tmp.update({'beta3': self.beta3})
+        tmp.update({'beta3': self.beta3, 'tau2': self.tau2})
         return tmp
 
     def __call__(self, t: float):
-        return NelsonSiegelSvensson.compute(self.beta0, self.beta1, self.beta2, self.beta3, self.tau, t)
+        return NelsonSiegelSvensson.compute(self.beta0, self.beta1, self.beta2, self.beta3, self.tau, self.tau2, t)
 
     @staticmethod
     def compute(beta0, beta1, beta2, beta3, tau, tau2, T):
@@ -298,6 +344,12 @@ class NelsonSiegelSvensson(NelsonSiegel):
 class DiscountCurveComposition(interfaces.FactoryObject):
     def __init__(self, a, b, c):
         # check if all discount curves have the same daycounter, otherwise exception
+        if isinstance(a,dict):
+            a = _create(a)
+        if isinstance(b,dict):
+            b = _create(b)
+        if isinstance(c,dict):
+            c = _create(c)
         dc = set()
         for k in [a,b,c]:
             if hasattr(k, 'daycounter'):
@@ -321,8 +373,30 @@ class DiscountCurveComposition(interfaces.FactoryObject):
         
 
     def _to_dict(self) -> dict:
-        raise NotImplementedError()
+        if hasattr(self.a, 'to_dict'):
+            a = self.a.to_dict()
+        else:
+            a = self.a
+        if hasattr(self.b, 'to_dict'):
+            b = self.b.to_dict()
+        else:
+            b = self.b
+        if hasattr(self.c, 'to_dict'):
+            c = self.c.to_dict()
+        else:
+            c = self.c
+        return {'a':a, 'b': b, 'c': c}
         
+        
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None, refdate: Union[datetime, date]=None, 
+                       parametrization_type = NelsonSiegel)->list:
+        curves = DiscountCurveParametrized._create_sample(n_samples, seed, refdate, parametrization_type)
+        results = []
+        for c in curves:
+            results.append(c+0.001)
+        return results
+
     def value(self, refdate: Union[date, datetime], d: Union[date, datetime])->float:
         r = self.value_rate(refdate, d)
         yf = self._dc.yf(refdate, d)
@@ -373,7 +447,7 @@ class DiscountCurveParametrized(interfaces.FactoryObject):
             parametrization = self.rate_parametrization.to_dict()
         except Exception as e:
             raise Exception('Missing implementation of to_dict() in parametrization of type ' + type(self.rate_parametrization).__name__)
-        return {'obj_id': self.obj_id, 'refdate': self.refdate, 'rate_parametrization': self.rate_parametrization}
+        return {'obj_id': self.obj_id, 'refdate': self.refdate, 'rate_parametrization': parametrization}
 
     def value(self, refdate: Union[date, datetime], d: Union[date, datetime])->float:
         """Return discount factor for a given date
@@ -412,6 +486,19 @@ class DiscountCurveParametrized(interfaces.FactoryObject):
             raise Exception('The given reference date is before the curves reference date.')
         yf = self._dc.yf(refdate, d)
         return self.rate_parametrization(yf)
+
+    @staticmethod
+    def _create_sample(n_samples: int, seed: int = None, refdate: Union[datetime, date]=None, 
+                       parametrization_type = NelsonSiegel)->list:
+        if seed is not None:
+            np.random.seed(seed)
+        if refdate is None:
+            refdate = datetime.now()
+        parametrizations = parametrization_type._create_sample(n_samples)
+        result = []
+        for i,p in enumerate(parametrizations):
+            result.append(DiscountCurveParametrized('DCP_'+str(i), refdate, p))
+        return result
 
     def __mul__(self, other):
         return DiscountCurveComposition(self, other, 0.0)
@@ -639,12 +726,12 @@ class PowerPriceForwardCurve:
         self.values = values
         # timegrid used to compute prices for a certain schedule
         self._tg = None
-        self._df = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, closed='left').to_pydatetime(), 
+        self._df = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, inclusive='left').to_pydatetime(), 
                                 'values': self.values}).set_index(['dates']).sort_index()
         
     def value(self, refdate: Union[date, datetime], schedule)->np.ndarray:
         if self._tg is None:
-            self._tg = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, closed='left').to_pydatetime(), 'values': self.values}).reset_index()
+            self._tg = pd.DataFrame({'dates': pd.date_range(self.start, self.end, freq=self.freq, tz=self.tz, inclusive='left').to_pydatetime(), 'values': self.values}).reset_index()
             if self._tg.shape[0] != self.values.shape[0]:
                 raise Exception('The number of dates (' + str(self._tg.shape[0])+') does not equal number of values (' + str(self.values.shape[0]) + ') in forward curve.')
         tg = self._tg[(self._tg.dates>=schedule.start)&(self._tg.dates<schedule.end)].set_index('dates')

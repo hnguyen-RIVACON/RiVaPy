@@ -56,47 +56,77 @@ class Issuer(interfaces.FactoryObject):
                  name: str,
                  rating: _Union[Rating, str],
                  esg_rating: _Union[ESGRating, str],
-                 country: str,
+                 country: _Union[Country, str],
                  sector: Sector):
         self.__obj_id = obj_id
         self.__name = name
         self.__rating = Rating.to_string(rating)
         self.__esg_rating = ESGRating.to_string(esg_rating)
-        self.__country = country
+        self.__country = Country.to_string(country)
         self.__sector = Sector.to_string(sector)
 
     @staticmethod
-    def _create_sample(n_samples: int, seed: int = None, issuer: List[str] = None)->List:
+    def _create_sample(n_samples: int, seed: int = None, issuer: List[str] = None, 
+                    rating_probs: np.ndarray = None, 
+                    country_probs:np.ndarray = None,
+                    sector_probs:np.ndarray = None,
+                    esg_rating_probs:np.ndarray=None )->List:
         """Just sample some test data
 
         Args:
-            n_samples (int): _description_
-            seed (int, optional): _description_. Defaults to None.
-            issuer (List[str], optional): _description_. Defaults to None.
-
+            n_samples (int): Number of samples.
+            seed (int, optional): If set, the seed is set, if None, no seed is explicitely set. Defaults to None.
+            issuer (List[str], optional): List of issuer names chosen from. If None, a unqiue name for each samples is generated. Defaults to None.
+            rating_probs (np.ndarray): Numpy array defining the probability for each rating (ratings ordererd from AAA (first) to D (last array element)). If None, all ratings are chosen with equal probabilities.
         Raises:
             Exception: _description_
 
         Returns:
-            List: _description_
+            List: List of sampled issuers.
         """
         if seed is not None:
             np.random.seed(seed)
         result = []
         ratings = list(Rating)
+        if rating_probs is not None:
+            if len(ratings) != rating_probs.shape[0]:
+                raise Exception('Number of rating probabilities must equal number of ratings')
+        else:
+            rating_probs = np.ones((len(ratings,)))/len(ratings)
+
+        if country_probs is not None:
+            if len(Country) != country_probs.shape[0]:
+                raise Exception('Number of country probabilities must equal number of countries')
+        else:
+            country_probs = np.ones((len(Country,)))/len(Country)
+
+        if sector_probs is not None:
+            if len(Sector) != sector_probs.shape[0]:
+                raise Exception('Number of sector probabilities must equal number of sectors')
+        else:
+            sector_probs = np.ones((len(Sector,)))/len(Sector)
+
+        if esg_rating_probs is not None:
+            if len(ESGRating) != esg_rating_probs.shape[0]:
+                raise Exception('Number of ESG rating probabilities must equal number of ESG ratings')
+        else:
+            esg_rating_probs = np.ones((len(ESGRating,)))/len(ESGRating)
+
+        
+            
         esg_ratings = list(ESGRating)
         sectors = list(Sector)
         country = list(Country)
         if issuer is None:
             issuer = ['Issuer_'+str(i) for i in range(n_samples)]
         elif (n_samples is not None) and (n_samples !=  len(issuer)):
-            raise Exception('Cannot create data since length of issuer list does not equal number of sampled. Set n_namples to None.')
+            raise Exception('Cannot create data since length of issuer list does not equal number of samples. Set n_namples to None.')
         for i in range(n_samples):
             result.append(Issuer('Issuer_'+str(i), issuer[i],
-                        np.random.choice(ratings), 
-                        np.random.choice(esg_ratings), 
-                        np.random.choice(country).value,
-                        np.random.choice(sectors)))
+                        np.random.choice(ratings, p=rating_probs), 
+                        np.random.choice(esg_ratings, p=esg_rating_probs), 
+                        np.random.choice(country, p=country_probs),
+                        np.random.choice(sectors, p=sector_probs)))
         return result
 
     def _to_dict(self) -> dict:

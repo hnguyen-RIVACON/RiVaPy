@@ -20,7 +20,7 @@ class CDSTest(unittest.TestCase):
         """Test simple CDS pricing using ISDA model.
         """
         if not _pyvacon_available:
-            self.assertAlmostEquals(1, 1)
+            self.assertAlmostEqual(1, 1)
             return
         refdate = datetime(2020,1,1)
         #yield curve

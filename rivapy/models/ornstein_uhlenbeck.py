@@ -76,6 +76,12 @@ class OrnsteinUhlenbeck(FactoryObject):
         return result
 
     def compute_expected_value(self, x0: Union[float, np.ndarray], T: float):
+        if callable(self.speed_of_mean_reversion):
+            raise NotImplementedError("Expected value is only implemented for constant speed of mean reversion")
+        if callable(self.volatility):
+            raise NotImplementedError("Expected value is only implemented for constant volatility")
+        if callable(self.mean_reversion_level):
+            raise NotImplementedError("Expected value is only implemented for constant mean reversion level")
         return x0*np.exp(-self.speed_of_mean_reversion*T) + self.mean_reversion_level*(1.0-np.exp(-self.speed_of_mean_reversion*T))
 
     def apply_mc_step(self, x: np.ndarray, 
