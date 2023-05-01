@@ -51,8 +51,8 @@ jobs:
       run: $CONDA/bin/python -m pip install sphinx_rtd_theme 
     - name: Build docs with sphinx
     - uses: r-lib/actions/setup-pandoc@v1
-    with:
-      pandoc-version: '2.9' # The pandoc version to download (if necessary) and use.
+      with:
+        pandoc-version: '2.9' # The pandoc version to download (if necessary) and use.
       run: $CONDA/bin/sphinx-build -b html docs/source/ docs/build
     - name: Store doc as artifact
       uses: actions/upload-artifact@v1
