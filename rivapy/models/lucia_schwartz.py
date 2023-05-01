@@ -86,9 +86,9 @@ class LuciaSchwartz(FactoryObject):
         Returns:
             Union[float, np.ndarray]: Expected value.
         """
-        if not isinstance(self.mu, float):
+        if callable(self.mu):
             raise NotImplementedError("Only implemented for fixed value of mu.")
-        if not isinstance(self.sigma2, float):
+        if callable(self.sigma2):
             raise NotImplementedError("Only implemented for fixed value of sigma2.")
         if len(x0.shape)==1:
             return self.X1.compute_expected_value(x0[0], T) + x0[1]+self.mu*T
