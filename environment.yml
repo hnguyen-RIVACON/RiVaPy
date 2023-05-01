@@ -15,6 +15,7 @@ dependencies:
   - scipy
   - sphinx
   - scikit-learn
+  - pandoc
   - pip:
     - python-dateutil
     - sphinx-rtd-theme
