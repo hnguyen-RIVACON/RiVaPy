@@ -16,6 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - uses: r-lib/actions/setup-pandoc@v1
+      with:
+        pandoc-version: '2.9' # The pandoc version to download (if necessary) and use.
+      
     #- name: Install boost
     #  run: sudo apt-get install libboost-dev
     - name: Set up Python 3.8
@@ -50,9 +54,6 @@ jobs:
     - name: Install rtd theme for sphinx doc from pypi
       run: $CONDA/bin/python -m pip install sphinx_rtd_theme 
     - name: Build docs with sphinx
-      uses: r-lib/actions/setup-pandoc@v1
-      with:
-        pandoc-version: '2.9' # The pandoc version to download (if necessary) and use.
       run: $CONDA/bin/sphinx-build -b html docs/source/ docs/build
     - name: Store doc as artifact
       uses: actions/upload-artifact@v1
