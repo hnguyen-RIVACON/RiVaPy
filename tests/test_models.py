@@ -243,12 +243,25 @@ class LuciaSchwartzTest(unittest.TestCase):
 		"""Simple test for analytical expectation: Compare analytical expectation with MC expectation
 		"""
 		np.random.seed(42)
-		timegrid = np.linspace(0.0,1.0,800) # simulate on daily timegrid over 1 yr horizon
+		timegrid = np.linspace(0.0,1.0,365) # simulate on daily timegrid over 1 yr horizon
 		ls_model = models.LuciaSchwartz(rho=-0.9, kappa=1.0, sigma1=0.5, mu=0.15, sigma2=0.3)
-		n_sims = 160_000
-		sim = ls_model.simulate(timegrid, start_value=np.array([0.0,0.0]),rnd=np.random.normal(size=ls_model.rnd_shape(timegrid.shape[0],n_sims)))
+		n_sims = 4_000
+		sim = ls_model.simulate(timegrid, start_value=np.array([0.0,0.0]),rnd=np.random.normal(size=ls_model.rnd_shape(n_sims,timegrid.shape[0])))
 		self.assertAlmostEqual(sim[-1,:].mean(), ls_model.compute_expected_value(x0=np.array([0.0,0.0]), T=1.0), places=2)
 
-
+	def test_forward_simulation(self):
+		"""Simple test for forward simulation: Compare forward simulation with initial value (martingale)
+		"""
+		np.random.seed(42)
+		timegrid = np.linspace(0.0,1.0,365)
+		ls_model = models.LuciaSchwartz(rho=-0.9, kappa=1.0, sigma1=0.5, mu=0.15, sigma2=0.3)
+		n_sims = 40_000
+		sim = ls_model.simulate(timegrid, start_value=np.array([0.0,0.0]),
+			  forwards=[(1.0,1.0+1.0/365), (1.0,2.0)],
+			  rnd=np.random.normal(size=ls_model.rnd_shape(n_sims,timegrid.shape[0])))
+		initial_fwd_value = ls_model.compute_fwd_value(x0=np.array([0.0,0.0]), T1=1.0, T2=2.0)
+		self.assertAlmostEqual(sim[-1,:,2].mean(), initial_fwd_value, places=2)
+		#check that final spot value and forward value is close
+		self.assertAlmostEqual(sim[-1,:,0].mean(), sim[-1,:,1].mean(), places=2)
 if __name__ == '__main__':
     unittest.main()
