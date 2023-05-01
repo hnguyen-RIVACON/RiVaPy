@@ -26,7 +26,7 @@ jobs:
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         $CONDA/bin/conda env update --file environment.yml --name base
-        $CONDA/bin/conda install pandoc
+        $CONDA/bin/conda install pandoc --channel conda-forge
     #- name: Install pyvacon from pypi test
     #  run: $CONDA/bin/python -m pip install pyvacon 
     - name: Lint with flake8
