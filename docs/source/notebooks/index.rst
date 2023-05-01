@@ -7,5 +7,7 @@ Stochastic Processes
     :maxdepth: 1
     :caption: Contents:
 
+    models/ornstein_uhlenbeck
     models/lucia_schwartz
+    
     
