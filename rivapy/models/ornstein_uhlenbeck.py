@@ -1,5 +1,6 @@
 from typing import Union, Callable
 import numpy as np
+import scipy
 from rivapy.tools.interfaces import FactoryObject
 
 class OrnsteinUhlenbeck(FactoryObject):
@@ -83,6 +84,20 @@ class OrnsteinUhlenbeck(FactoryObject):
         if callable(self.mean_reversion_level):
             raise NotImplementedError("Expected value is only implemented for constant mean reversion level")
         return x0*np.exp(-self.speed_of_mean_reversion*T) + self.mean_reversion_level*(1.0-np.exp(-self.speed_of_mean_reversion*T))
+
+    def compute_call_price(self, X0: Union[float, np.ndarray], K: float, ttm: float):
+        if callable(self.speed_of_mean_reversion):
+            raise NotImplementedError("Expected value is only implemented for constant speed of mean reversion")
+        if callable(self.volatility):
+            raise NotImplementedError("Expected value is only implemented for constant volatility")
+        if callable(self.mean_reversion_level):
+            raise NotImplementedError("Expected value is only implemented for constant mean reversion level")
+        g = X0 * np.exp(-self.speed_of_mean_reversion * ttm) + self.mean_reversion_level * (1.0 - np.exp(-self.speed_of_mean_reversion * ttm))
+        sigma_bar = self.volatility * self.volatility * (1.0 / ( 2.0 * self.speed_of_mean_reversion)) 
+        sigma_bar = sigma_bar * (1.0 - np.exp(-2.0 * self.speed_of_mean_reversion * ttm))
+        sigma_bar = np.sqrt(sigma_bar)
+        d = (g - self._K) / sigma_bar
+        return (g - self._K) * scipy.stats.norm.cdf(d) + sigma_bar * scipy.stats.norm.pdf(d)
 
     def apply_mc_step(self, x: np.ndarray, 
                         t0: float, t1: float, 
