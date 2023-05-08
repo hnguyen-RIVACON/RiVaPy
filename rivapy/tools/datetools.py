@@ -198,8 +198,6 @@ class Schedule:
         self.business_day_convention = business_day_convention
         self.calendar = calendar
 
-    
-
     @property
     def start_day(self):
         """
@@ -382,6 +380,241 @@ class Schedule:
         logger.debug("Schedule dates successfully calculated from '"
                      + str(self.__start_day) + "' to '" + str(self.__end_day) + "'.")
         return rolled_schedule_dates
+
+
+
+
+# class PowerSchedule:
+#     def __init__(self,
+#                  start_day: _Union[date, datetime],
+#                  end_day: _Union[date, datetime],
+#                  time_period: _Union[Period, str],
+#                  backwards: bool = True,
+#                  business_day_convention: _Union[RollConvention, str] = RollConvention.MODIFIED_FOLLOWING,
+#                  calendar: _Union[_HolidayBase, str] = None):
+#         """
+        
+#         Args:
+#             start_day (_Union[date, datetime]): Schedule's first day - beginning of the schedule.
+#             end_day (_Union[date, datetime]): Schedule's last day - end of the schedule.
+#             time_period (_Union[Period, str]): Time distance between two consecutive dates.
+#             backwards (bool, optional): Defines direction for rolling out the schedule. True means the schedule will be
+#                                         rolled out (backwards) from end day to start day. Defaults to True.
+#             stub (bool, optional): Defines if the first/last period is accepted (True), even though it is shorter than
+#                                    the others, or if it remaining days are added to the neighbouring period (False).
+#                                    Defaults to True.
+#             business_day_convention (_Union[RollConvention, str], optional): Set of rules defining the adjustment of
+#                                                                              days to ensure each date being a business
+#                                                                              day with respect to a given holiday
+#                                                                              calendar. Defaults to
+#                                                                              RollConvention.MODIFIED_FOLLOWING
+#             calendar (_Union[_HolidayBase, str], optional): Holiday calendar defining the bank holidays of a country or
+#                                                           province (but not all non-business days as for example
+#                                                           Saturdays and Sundays).
+#                                                           Defaults (through constructor) to holidays.ECB
+#                                                           (= Target2 calendar) between start_day and end_day.
+
+#         Examples:
+
+#             .. code-block:: python
+            
+#                 >>> from datetime import date
+#                 >>> from rivapy.tools import schedule
+#                 >>> schedule = Schedule(date(2020, 8, 21), date(2021, 8, 21), Period(0, 3, 0), True, False, RollConvention.UNADJUSTED, holidays_de).generate_dates(False),
+#                        [date(2020, 8, 21), date(2020, 11, 21), date(2021, 2, 21), date(2021, 5, 21), date(2021, 8, 21)])
+#         """
+#         self.start_day = start_day
+#         self.end_day = end_day
+#         self.time_period = time_period
+#         self.backwards = backwards
+#         self.business_day_convention = business_day_convention
+#         self.calendar = calendar
+
+    
+
+#     @property
+#     def start_day(self):
+#         """
+#         Getter for schedule's start date.
+
+#         Returns:
+#             Start date of specified schedule.
+#         """
+#         return self.__start_day
+
+#     @start_day.setter
+#     def start_day(self, start_day: _Union[date, datetime]):
+#         self.__start_day = _date_to_datetime(start_day)
+
+#     @property
+#     def end_day(self):
+#         """
+#         Getter for schedule's end date.
+
+#         Returns:
+#             End date of specified schedule.
+#         """
+#         return self.__end_day
+
+#     @end_day.setter
+#     def end_day(self, end_day: _Union[date, datetime]):
+#         self.__end_day = _date_to_datetime(end_day)
+
+#     @property
+#     def time_period(self):
+#         """
+#         Getter for schedule's time period.
+
+#         Returns:
+#             Time period of specified schedule.
+#         """
+#         return self.__time_period
+
+#     @time_period.setter
+#     def time_period(self, time_period: _Union[Period, str]):
+#         self.__time_period = _term_to_period(time_period)
+
+#     @property
+#     def backwards(self):
+#         """
+#         Getter for schedule's roll out direction.
+
+#         Returns:
+#             True, if rolled out from end day to start day.
+#             False, if rolled out from start day to end day.
+#         """
+#         return self.__backwards
+
+#     @backwards.setter
+#     def backwards(self, backwards: bool):
+#         self.__backwards = backwards
+
+#     @property
+#     def stub(self):
+#         """
+#         Getter for potential existence of short periods (stubs).
+
+#         Returns:
+#             True, if a shorter period is allowed.
+#             False, if only a longer period is allowed.
+#         """
+#         return self.__stub
+
+#     @stub.setter
+#     def stub(self, stub: bool):
+#         self.__stub = stub
+
+#     @property
+#     def business_day_convention(self):
+#         """
+#         Getter for schedule's business day convention.
+
+#         Returns:
+#             Business day convention of specified schedule.
+#         """
+#         return self.__business_day_convention
+
+#     @business_day_convention.setter
+#     def business_day_convention(self, business_day_convention: _Union[RollConvention, str]):
+#         self.__business_day_convention = RollConvention.to_string(business_day_convention)
+
+#     @property
+#     def calendar(self):
+#         """
+#         Getter for schedule's holiday calendar.
+
+#         Returns:
+#             Holiday calendar of specified schedule.
+#         """
+#         return self.__calendar
+
+#     @calendar.setter
+#     def calendar(self, calendar: _Union[_HolidayBase, str]):
+#         if calendar is None:
+#             self.__calendar = _ECB(years=range(self.__start_day.year, self.__end_day.year + 1))
+#         else:
+#             self.__calendar = _string_to_calendar(calendar)
+
+#     @staticmethod
+#     def _roll_out(from_: _Union[date, datetime], to_: _Union[date, datetime], term: Period, backwards: bool,
+#                   allow_stub: bool) -> _List[date]:
+#         """
+#         Rolls out dates from from_ to to_ in the specified direction applying the given term under consideration of the
+#         specification for allowing shorter periods.
+
+#         Args:
+#             from_ (_Union[date, datetime]): Beginning of the roll out mechanism.
+#             to_ (_Union[date, datetime]): End of the roll out mechanism.
+#             term (Period): Difference between rolled out dates.
+#             backwards (bool): Direction of roll out mechanism: backwards if True, forwards if False.
+#             allow_stub (bool): Defines if periods shorter than term are allowed.
+
+#         Returns:
+#             Date schedule not yet adjusted to any business day convention.
+#         """
+#         # convert datetime to date (if necessary):
+#         from_ = _date_to_datetime(from_)
+#         to_ = _date_to_datetime(to_)
+
+#         # check input consistency:
+#         if (~backwards) & (from_ < to_):
+#             direction = +1
+#         elif backwards & (from_ > to_):
+#             direction = -1
+#         else:
+#             raise Exception("From-date '" + str(from_) + "' and to-date '" + str(to_) +
+#                             "' are not consistent with roll direction (backwards = '" + str(backwards) + "')!")
+
+#         # generates a list of dates ...
+#         dates = []
+#         # ... for forward rolling case  or  backward rolling case ...
+#         while ((~backwards) & (from_ <= to_)) | (backwards & (to_ <= from_)):
+#             dates.append(from_)
+#             from_ += direction * relativedelta(years=term.years, months=term.months, days=term.days)
+#             # ... and compete list for fractional periods ...
+#         if dates[-1] != to_:
+#             # ... by adding stub or ...
+#             if allow_stub:
+#                 dates.append(to_)
+#             # ... by extending last period.
+#             else:
+#                 dates[-1] = to_
+#         return dates
+
+#     def generate_dates(self, ends_only: bool) -> _List[date]:
+#         """
+#         Generate list of schedule days according to the schedule specification, in particular with regards to business
+#         day convention and calendar given.
+
+#         Args:
+#             ends_only (bool): Flag to indicate if period beginnings shall be included, e.g. for defining accrual
+#                               periods: True, if only period ends shall be included, e.g. for defining payment dates.
+
+#         Returns:
+#             List[date]: List of schedule dates (including start and end date) adjusted to rolling convention.
+#         """
+#         # roll out dates ignoring any business day issues
+#         if self.__backwards:
+#             schedule_dates = Schedule._roll_out(self.__end_day, self.__start_day, self.__time_period,
+#                                                 True, self.__stub)
+#             schedule_dates.reverse()
+#         else:
+#             schedule_dates = Schedule._roll_out(self.__start_day, self.__end_day, self.__time_period,
+#                                                 False, self.__stub)
+
+#         # adjust according to business day convention
+#         rolled_schedule_dates = [roll_day(schedule_dates[0], self.__calendar, self.__business_day_convention,
+#                                           schedule_dates[0])]
+#         [rolled_schedule_dates.append(roll_day(schedule_dates[i], self.__calendar, self.__business_day_convention,
+#                                                rolled_schedule_dates[i - 1])) for i in range(1, len(schedule_dates))]
+
+#         if ends_only:
+#             rolled_schedule_dates.pop(0)
+
+#         logger.debug("Schedule dates successfully calculated from '"
+#                      + str(self.__start_day) + "' to '" + str(self.__end_day) + "'.")
+#         return rolled_schedule_dates
+
 
 
 def _date_to_datetime(date_time: _Union[datetime, date]
