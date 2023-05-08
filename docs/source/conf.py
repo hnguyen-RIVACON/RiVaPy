@@ -42,7 +42,8 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx_rtd_theme',
     'sphinxcontrib.bibtex',
-    'nbsphinx'
+    'nbsphinx',
+    "sphinx_gallery.load_style"
 ]
 
 # Add bibtex file
