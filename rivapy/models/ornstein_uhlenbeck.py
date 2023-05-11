@@ -86,6 +86,21 @@ class OrnsteinUhlenbeck(FactoryObject):
         return x0*np.exp(-self.speed_of_mean_reversion*T) + self.mean_reversion_level*(1.0-np.exp(-self.speed_of_mean_reversion*T))
 
     def compute_call_price(self, X0: Union[float, np.ndarray], K: float, ttm: float):
+        """Computes the price of a call option with strike K and time to maturity ttm for a spot following the Ornstein-Uhlenbeck process.
+
+        It works only for constant speed of mean reversion, volatility and mean reversion level and throws a NotImplementedError otherwise. It does not encounter dividends or interest rates.
+
+        Args:
+            X0 (Union[float, np.ndarray]): Start value of the process.
+            K (float): Strike of the call option.
+            ttm (float): Time to maturity of the call option.
+
+        Raises:
+            NotImplementedError: If speed of mean reversion, volatility or mean reversion level are not constant.
+            
+        Returns:
+            float: Price of the call option.
+        """
         if callable(self.speed_of_mean_reversion):
             raise NotImplementedError("Expected value is only implemented for constant speed of mean reversion")
         if callable(self.volatility):
@@ -96,8 +111,8 @@ class OrnsteinUhlenbeck(FactoryObject):
         sigma_bar = self.volatility * self.volatility * (1.0 / ( 2.0 * self.speed_of_mean_reversion)) 
         sigma_bar = sigma_bar * (1.0 - np.exp(-2.0 * self.speed_of_mean_reversion * ttm))
         sigma_bar = np.sqrt(sigma_bar)
-        d = (g - self._K) / sigma_bar
-        return (g - self._K) * scipy.stats.norm.cdf(d) + sigma_bar * scipy.stats.norm.pdf(d)
+        d = (g - K) / sigma_bar
+        return (g - K) * scipy.stats.norm.cdf(d) + sigma_bar * scipy.stats.norm.pdf(d)
 
     def apply_mc_step(self, x: np.ndarray, 
                         t0: float, t1: float, 

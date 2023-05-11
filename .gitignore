@@ -5,3 +5,4 @@ docs/build/*
 .vscode/settings.json
 notebooks/test_data/*
 rivapy/user_settings.py
+docs/source/notebooks/models/geo_data/*

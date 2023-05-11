@@ -237,7 +237,19 @@ class OrnsteinUhlenbeckTest(unittest.TestCase):
 		n_sims = 1000
 		sim = ou_model.simulate(timegrid, start_value=0.2,rnd=np.random.normal(size=(timegrid.shape[0],n_sims)))
 		self.assertAlmostEqual(sim[-1,:].mean(), ou_model.compute_expected_value(0.2,1.0), places=3)
-		
+
+	def test_call_price(self):
+		"""Simple test for call price: Compare analytical call price with MC call price
+		"""
+		K = 1.0
+		T=1.0
+		timegrid = np.linspace(0.0,T,num=240)
+		ou_model = models.OrnsteinUhlenbeck(speed_of_mean_reversion = 2.0, volatility=0.4)
+		n_sims = 10_000
+		sim = ou_model.simulate(timegrid, start_value=0.2,rnd=np.random.normal(size=(timegrid.shape[0],n_sims)))
+		mc_call_price = np.mean(np.maximum(sim[-1,:]-K,0.0))
+		analytical_call_price = ou_model.compute_call_price(0.2, K, T)
+		self.assertAlmostEqual(mc_call_price, analytical_call_price, places=2)
 class LuciaSchwartzTest(unittest.TestCase):
 	def test_expectation(self):
 		"""Simple test for analytical expectation: Compare analytical expectation with MC expectation
