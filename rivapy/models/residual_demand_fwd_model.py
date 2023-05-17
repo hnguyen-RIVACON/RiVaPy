@@ -37,12 +37,26 @@ class ForwardSimulationResult(abc.ABC):
     def get(self, key: str)->np.ndarray:
         pass
     
+class WindPowerForecastModelParameter(FactoryObject):
+        def __init__(self, n_call_strikes:int = 20, min_strike: float=-5.0, max_strike: float=5.0):
+            """Parameter class for the wind power forecast model.
 
+            Args:
+                n_call_strikes (int, optional): Number of calls used to approximate the expectation of inverse logit applied to Ornsetin-Uhlenbeck. Defaults to 20.
+                min_strike (float, optional): Minimal strike used to compute the approximation of inverse logit applied to Ornsetin-Uhlenbeck. Defaults to -5.0.
+                max_strike (float, optional): Maximal strike used to compute the approximation of inverse logit applied to Ornsetin-Uhlenbeck. Defaults to 5.0.
+            """
+            self.n_call_strikes = n_call_strikes
+            self.min_strike = min_strike
+            self.max_strike = max_strike
+
+        def _to_dict(self) -> dict:
+            return {'n_call_strikes': self.n_call_strikes,
+                    'min_strike': self.min_strike,
+                    'max_strike': self.max_strike}
 
 class WindPowerForecastModel(BaseFwdModel):
-    class SimulationParameter:
-        def __init__(self, n_call_strikes:int = 20):
-            pass
+    
         
     class ForwardSimulationResult(ForwardSimulationResult):
         def __init__(self, paths:np.ndarray, 
@@ -65,45 +79,17 @@ class WindPowerForecastModel(BaseFwdModel):
             return self._model.udls()
 
         def get(self, key: str, 
-                forecast_timepoints: List[int]=None, n_points_approx_call:int=100)->np.ndarray:
+                forecast_timepoints: List[int]=None)->np.ndarray:
             expiry =  BaseFwdModel.get_expiry_from_key(key)
-            return self._get(expiry, forecast_timepoints, n_points_approx_call=n_points_approx_call)
+            return self._get(expiry, forecast_timepoints)
 
-        def _compute_call_grid(self, min_spot: np.ndarray, max_spot: float, 
-                            n_points: int, ttm: float):
-            """Compute a grid of call prices (depending on spot) for the ou model that is used to 
-            to efficiently approximate the expectation of the _inverse_logit.
-
-            Args:
-                ttm (float): Time to maturity
-            """
-            strikes = self._model.call_strikes
-            spots = np.linspace(min_spot, max_spot, num=n_points, endpoint=True)
-            prices = np.empty((strikes.shape[0], n_points,))
-            for i in range(strikes.shape[0]):
-                prices[i,:] = self._model.ou.compute_call_price(spots, strikes[i], ttm)
-            return spots, prices
-        
-        def _compute_expectation_inv_logit(self, result: np.ndarray, spots: np.ndarray, 
-                                           ttm: float, n_points_approx_call: int):
-            spot_grid, price_grid = self._compute_call_grid(spots.min(), spots.max(),
-                                                            n_points=n_points_approx_call, ttm=ttm)
-            result[:] = self._model.call_weights[0]*np.interp(spots, spot_grid, price_grid[0,:])
-            for i in range(1, price_grid.shape[0]):
-                result += self._model.call_weights[i]*np.interp(spots, spot_grid, price_grid[i,:])
-            
-
-
-        def _get(self, expiry: int, forecast_timepoints: List[int], 
-                 n_points_approx_call: int)->np.ndarray:
+        def _get(self, expiry: int, forecast_timepoints: List[int])->np.ndarray:
             result = np.empty(self._paths.shape)
             for i in range(self._timegrid.shape[0]):
                 #result[i,:] = self._model.get_forward(self._paths[i,:], self.expiries[expiry]-self._timegrid[i], self._ou_additive_forward_corrections[expiry])
-                self._compute_expectation_inv_logit(result[i,:],
-                                                     self._paths[i,:]+self._ou_additive_forward_corrections[expiry],
-                                                     self.expiries[expiry]-self._timegrid[i], 
-                                                     n_points_approx_call=n_points_approx_call)
-                
+                self._model._compute_expectation_inv_logit(result[i,:],
+                                                     self._paths[i,:]+self._ou_additive_forward_corrections[expiry], # we shift the path to fit the initial forecast at time 0
+                                                     self.expiries[expiry]-self._timegrid[i])   
             if forecast_timepoints is not None:
                 ftp_prev = 1
                 for ftp in forecast_timepoints:
@@ -119,6 +105,7 @@ class WindPowerForecastModel(BaseFwdModel):
     def __init__(self, region: str,
                     speed_of_mean_reversion: float, 
                     volatility: float,
+                    params: WindPowerForecastModelParameter=None
                     ):
         """Simple model to simulate forecasts of wind efficiencies (power production by wind as percentage of total wind capacity) based on the Ornstein-Uhlenbeck process.
 
@@ -148,9 +135,31 @@ class WindPowerForecastModel(BaseFwdModel):
         #    raise Exception('Number of forward expiries does not equal number of initial forecasts. Each forward expiry needs an own forecast.')
         self.ou = OrnsteinUhlenbeck(speed_of_mean_reversion, volatility, mean_reversion_level=0.0)
         self.region = region
-        self.call_strikes, self.call_weights = WindPowerForecastModel._compute_strikes_weights(n_strikes=50, min_strike=-5.0, max_strike=5.0)
-        
-        
+        if params is None:
+            self.params = WindPowerForecastModelParameter()
+        else:
+            self.params = params
+        self.call_strikes, self.call_weights = WindPowerForecastModel._compute_strikes_weights(self.params.n_call_strikes, 
+                                                                                               self.params.min_strike,                                                                                            self.params.max_strike)
+    def _compute_expectation_inv_logit(self, result: np.ndarray, spots: np.ndarray, 
+                                           ttm: float):
+        """Compute the expectation of the inverse logit applied to the ou model.
+
+        Args:
+            result (np.ndarray): Array to store the result
+            spots (np.ndarray): Array of spots
+            ttm (float): Time to maturity
+        """
+        strikes = self.call_strikes
+        ref_spots = np.linspace(spots.min(), spots.max(), num=self.params.n_call_strikes, endpoint=True)
+        prices = np.empty((strikes.shape[0], self.params.n_call_strikes,))
+        for i in range(strikes.shape[0]):
+            prices[i,:] = self.ou.compute_call_price(ref_spots, strikes[i], ttm)
+    
+        result[:] = self.call_weights[0]*np.interp(spots, ref_spots, prices[0,:])
+        for i in range(1, prices.shape[0]):
+            result += self.call_weights[i]*np.interp(spots, ref_spots, prices[i,:])
+
     def _compute_ou_additive_forward_correction(self, expiries, initial_forecasts):
         # we determine the additive correction term such that the expected value 
         # of the inverse logit is equal to the initial forecast
@@ -164,7 +173,7 @@ class WindPowerForecastModel(BaseFwdModel):
         
         result = np.empty((len(expiries)))
         for i in range(len(expiries)):
-            result[i] = scipy.optimize.brentq(error(i), -7.0, 7.0, xtol=1e-6)
+            result[i] = scipy.optimize.brentq(error(i), -15.0, 15.0, xtol=1e-6)
         return result
 
     def _to_dict(self)->dict:
@@ -185,6 +194,7 @@ class WindPowerForecastModel(BaseFwdModel):
             weights[s+1] += f[s]*butterfly_weights[2]
         weights[-2] -= 0.5* butterfly_weights[1]*f[s]
         return strikes, weights[:-1]
+
 
     @staticmethod
     def eval_call_functions(strikes, weights, x):
@@ -445,8 +455,10 @@ class ResidualDemandForwardModel(BaseFwdModel):
     
 
 if __name__=='__main__':
-    model = WindPowerForecastModel('Onshore', speed_of_mean_reversion=0.1, volatility=1.5)
+    params = WindPowerForecastModelParameter(n_call_strikes=80, min_strike=-9.0, max_strike=9.0)
+    model = WindPowerForecastModel('Onshore', speed_of_mean_reversion=1.5, volatility=5.5, params=params)
     timegrid = np.linspace(0.0,1.0, 365)
+    np.random.seed(42)
     rnd = np.random.normal(size=model.rnd_shape(10, timegrid.shape[0]))
     results = model.simulate(timegrid, rnd, expiries=[1.0], initial_forecasts=[0.8], startvalue=0.0)
    
