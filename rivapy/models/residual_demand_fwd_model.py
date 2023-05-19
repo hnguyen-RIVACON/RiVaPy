@@ -6,10 +6,6 @@ import abc
 from typing import Union, Callable, List, Tuple, Dict, Protocol, Set
 import scipy
 from scipy.special import comb
-
-import sys
-sys.path.append( 'C:/Users/doeltz/development/RiVaPy/' )
-
 from rivapy.tools.interfaces import FactoryObject
 from rivapy.models.factory import create as _create
 from rivapy.models.ornstein_uhlenbeck import OrnsteinUhlenbeck
@@ -92,8 +88,9 @@ class WindPowerForecastModel(BaseFwdModel):
             for i in range(self._timegrid.shape[0]):
                 #result[i,:] = self._model.get_forward(self._paths[i,:], self.expiries[expiry]-self._timegrid[i], self._ou_additive_forward_corrections[expiry])
                 self._model._compute_expectation_inv_logit(result[i,:],
-                                                     self._paths[i,:]+self._ou_additive_forward_corrections[expiry], # we shift the path to fit the initial forecast at time 0
-                                                     self.expiries[expiry]-self._timegrid[i])   
+                                                     self._paths[i,:], 
+                                                     self.expiries[expiry]-self._timegrid[i], 
+                                                     self._ou_additive_forward_corrections[expiry])   
             if forecast_timepoints is not None:
                 ftp_prev = 1
                 for ftp in forecast_timepoints:
@@ -144,21 +141,23 @@ class WindPowerForecastModel(BaseFwdModel):
         else:
             self.params = params
         self.call_strikes, self.call_weights = WindPowerForecastModel._compute_strikes_weights(self.params.n_call_strikes, 
-                                                                                               self.params.min_strike,                                                                                            self.params.max_strike)
+                                                                                               self.params.min_strike,
+                                                                                               self.params.max_strike)
     def _compute_expectation_inv_logit(self, result: np.ndarray, spots: np.ndarray, 
-                                           ttm: float):
+                                           ttm: float, strike_offset: float=0.0):
         """Compute the expectation of the inverse logit applied to the ou model.
 
         Args:
             result (np.ndarray): Array to store the result
             spots (np.ndarray): Array of spots
             ttm (float): Time to maturity
+            strike_offset (float, optional): Offset to the strike (needed to fit the forecast at initial time). Defaults to 0.0.
         """
         strikes = self.call_strikes
         ref_spots = np.linspace(spots.min(), spots.max(), num=self.params.n_call_strikes, endpoint=True)
         prices = np.empty((strikes.shape[0], self.params.n_call_strikes,))
         for i in range(strikes.shape[0]):
-            prices[i,:] = self.ou.compute_call_price(ref_spots, strikes[i], ttm)
+            prices[i,:] = self.ou.compute_call_price(ref_spots, strikes[i]-strike_offset, ttm)
     
         result[:] = self.call_weights[0]*np.interp(spots, ref_spots, prices[0,:])
         for i in range(1, prices.shape[0]):
