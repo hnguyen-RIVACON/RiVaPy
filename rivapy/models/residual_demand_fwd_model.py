@@ -6,6 +6,10 @@ import abc
 from typing import Union, Callable, List, Tuple, Dict, Protocol, Set
 import scipy
 from scipy.special import comb
+
+import sys
+sys.path.append( 'C:/Users/doeltz/development/RiVaPy/' )
+
 from rivapy.tools.interfaces import FactoryObject
 from rivapy.models.factory import create as _create
 from rivapy.models.ornstein_uhlenbeck import OrnsteinUhlenbeck
@@ -167,7 +171,7 @@ class WindPowerForecastModel(BaseFwdModel):
             def _error(correction):
                 tmp = 0
                 for j in range(self.call_strikes.shape[0]):
-                    tmp += self.call_weights[j]*self.ou.compute_call_price(correction, self.call_strikes[j], expiries[i])  
+                    tmp += self.call_weights[j]*self.ou.compute_call_price(0.0, self.call_strikes[j]-correction, expiries[i])  
                 return tmp-initial_forecasts[i]
             return _error
         
@@ -456,7 +460,7 @@ class ResidualDemandForwardModel(BaseFwdModel):
 
 if __name__=='__main__':
     params = WindPowerForecastModelParameter(n_call_strikes=80, min_strike=-9.0, max_strike=9.0)
-    model = WindPowerForecastModel('Onshore', speed_of_mean_reversion=1.5, volatility=5.5, params=params)
+    model = WindPowerForecastModel('Onshore', speed_of_mean_reversion=1.5, volatility=0.05, params=params)
     timegrid = np.linspace(0.0,1.0, 365)
     np.random.seed(42)
     rnd = np.random.normal(size=model.rnd_shape(10, timegrid.shape[0]))

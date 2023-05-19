@@ -275,5 +275,10 @@ class LuciaSchwartzTest(unittest.TestCase):
 		self.assertAlmostEqual(sim[-1,:,2].mean(), initial_fwd_value, places=2)
 		#check that final spot value and forward value is close
 		self.assertAlmostEqual(sim[-1,:,0].mean(), sim[-1,:,1].mean(), places=2)
+
+class WindPowerForecastModel(unittest.TestCase):
+	def test_initial_forecast(self):
+		"""Simple test for initial forecast: Compare initial forecast with initial value (martingale)
+		"""
 if __name__ == '__main__':
     unittest.main()
