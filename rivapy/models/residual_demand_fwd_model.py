@@ -354,6 +354,7 @@ class MultiRegionWindForecastModel(BaseFwdModel):
         return [r.name() for r in self._region_forecast_models]
 
     def simulate(self, timegrid, rnd: np.ndarray, expiries: List[float],
+                
                 initial_forecasts: Dict[str,List[float]], startvalue=0.0):
         results = {}
         for region in self._region_forecast_models:
@@ -371,6 +372,104 @@ class MultiRegionWindForecastModel(BaseFwdModel):
         for v in self._region_forecast_models:
             result.update(v.udls())
         return result
+
+class LinearDemandForwardModel(BaseFwdModel):
+    class ForwardSimulationResult(ForwardSimulationResult):
+        def __init__(self, model, highest_price, wind_results, additive_correction):
+            self._model = model
+            self._highest_price = highest_price
+            self._wind = wind_results
+            self._additive_correction = additive_correction
+            
+        def n_forwards(self)->float:
+            return self._wind.n_forwards()
+            
+        def udls(self)->Set[str]:
+            return self._model.udls()
+
+        def get(self, key: str, forecast_timepoints: List[int]=None)->np.ndarray:
+            udl = BaseFwdModel.get_udl_from_key(key)
+            if udl == self._model.power_name:
+                expiry = BaseFwdModel.get_expiry_from_key(key)
+                return self._get(expiry, forecast_timepoints)
+            else:
+                return self._wind.get(key, forecast_timepoints)
+
+        def _get(self, expiry: int, forecast_timepoints: List[int])->np.ndarray:
+            total_produced = self._wind.get(BaseFwdModel.get_key(self._wind._model.name, expiry), forecast_timepoints)
+            power_fwd = np.empty((total_produced.shape[0], total_produced.shape[1]))
+            for i in range(total_produced.shape[0]):
+                power_fwd[i,:] =  (1.0-total_produced[i,:] )*(self._highest_price[i,:]+self._additive_correction[expiry])
+            return power_fwd
+        
+    def __init__(self, wind_power_forecast: MultiRegionWindForecastModel,
+                        highest_price_ou_model, 
+                        forecast_hours: List[int]=None,
+                        power_name:str = None):
+        #print(wind_power_forecast)
+        self.wind_power_forecast = _create(wind_power_forecast)
+        self.highest_price_ou_model = _create(highest_price_ou_model)
+        self.forecast_hours = forecast_hours
+        if power_name is not None:
+            self.power_name = power_name
+        else:
+            self.power_name = 'POWER'    
+        #self.region_to_capacity = region_to_capacity
+        
+    def _to_dict(self)->dict:
+        return {'wind_power_forecast': self.wind_power_forecast.to_dict(),
+                'supply_curve': self.supply_curve.to_dict(),
+                'highest_price_ou_model': self.highest_price_ou_model.to_dict(),
+                'forecast_hours': self.forecast_hours,
+                'max_price': self.max_price,
+                'power_name': self.power_name,
+                #'region_to_capacity': self.region_to_capacity
+                }
+
+    def rnd_shape(self, n_sims: int, n_timesteps: int)->tuple:
+        rnd_shape = self.wind_power_forecast.rnd_shape(n_sims, n_timesteps)
+        if len(rnd_shape) == 3:
+            return (rnd_shape[0]+1, rnd_shape[1], rnd_shape[2])
+        return (2, rnd_shape[0], rnd_shape[1])
+
+    def get_technology(self)->str:
+        """Return name of the technology modeled.
+
+        Returns:
+            str: Name of instrument.
+        """
+        return self.wind_power_forecast.region
+    
+    def _compute_additive_correction(self, expiries: List[float],
+                                     power_fwd_prices: List[float],
+                initial_forecasts: Dict[str,List[float]], startvalue=0.0 ):
+        result = np.empty((len(expiries)))
+        for i in range(len(expiries)):
+            tmp = 0
+            for k,v in initial_forecasts.items():
+                tmp += v[i]*self.wind_power_forecast.region_relative_capacity(k)
+                if abs(1.0-tmp) < 1e-5:
+                    raise Exception('Initial forecasts sum to 1.0. Cannot compute additive correction.')
+                result[i] = power_fwd_prices[i] + self.highest_price_ou_model.compute_expected_value(startvalue, expiries[i])/(1.0-tmp)-startvalue
+        return result
+    
+    def simulate(self, timegrid: np.ndarray, 
+                rnd: np.ndarray, 
+                expiries: List[float],
+                power_fwd_prices: List[float],
+                initial_forecasts: Dict[str, List[float]]):
+        additive_correction = self._compute_additive_correction(expiries, power_fwd_prices, initial_forecasts, startvalue=power_fwd_prices[0])
+        highest_prices = self.highest_price_ou_model.simulate(timegrid, power_fwd_prices[0], rnd[0,:])
+        simulated_wind = self.wind_power_forecast.simulate(timegrid, rnd[1:,:], expiries, initial_forecasts)
+        return LinearDemandForwardModel.ForwardSimulationResult(self, highest_prices, simulated_wind, additive_correction)
+    
+    def udls(self)->Set[str]:
+        result = self.wind_power_forecast.udls()
+        result.add(self.power_name)
+        return result
+        
+    
+
 
 class ResidualDemandForwardModel(BaseFwdModel):
     class ForwardSimulationResult(ForwardSimulationResult):
