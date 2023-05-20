@@ -278,7 +278,19 @@ class LuciaSchwartzTest(unittest.TestCase):
 
 class WindPowerForecastModel(unittest.TestCase):
 	def test_initial_forecast(self):
-		"""Simple test for initial forecast: Compare initial forecast with initial value (martingale)
+		"""Simple test for initial forecast: Compare initial forecast with initial value (martingale) 
+		and the mean at the first expiry of MC simulation
 		"""
+		params = models.WindPowerForecastModelParameter(n_call_strikes=40, min_strike=-7.0, max_strike=7.0)
+		model = models.WindPowerForecastModel('Onshore', speed_of_mean_reversion=0.5, volatility=1.5, params=params)
+		timegrid = np.linspace(0.0,1.0, 365)
+		np.random.seed(42)
+		rnd = np.random.normal(size=model.rnd_shape(1_000, timegrid.shape[0]))
+		forecast = 0.8
+		results = model.simulate(timegrid, rnd, expiries=[1.0], initial_forecasts=[forecast], startvalue=0.0)
+		sim_fwd = results.get('Onshore_FWD0')
+		self.assertAlmostEqual(sim_fwd[-1,:].mean(), forecast, places=2)
+		self.assertAlmostEqual(sim_fwd[0,0], forecast, places=2)
+
 if __name__ == '__main__':
     unittest.main()
