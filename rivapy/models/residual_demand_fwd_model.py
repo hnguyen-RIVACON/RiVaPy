@@ -403,12 +403,13 @@ class LinearDemandForwardModel(BaseFwdModel):
             return power_fwd
         
     def __init__(self, wind_power_forecast: MultiRegionWindForecastModel,
-                        highest_price_ou_model, 
+                        x_volatility: float,
+                        x_mean_reversion_speed: float,
                         forecast_hours: List[int]=None,
                         power_name:str = None):
         #print(wind_power_forecast)
         self.wind_power_forecast = _create(wind_power_forecast)
-        self.highest_price_ou_model = _create(highest_price_ou_model)
+        self.highest_price_ou_model = OrnsteinUhlenbeck(x_mean_reversion_speed, x_volatility, 0.0)
         self.forecast_hours = forecast_hours
         if power_name is not None:
             self.power_name = power_name
@@ -450,7 +451,7 @@ class LinearDemandForwardModel(BaseFwdModel):
                 tmp += v[i]*self.wind_power_forecast.region_relative_capacity(k)
                 if abs(1.0-tmp) < 1e-5:
                     raise Exception('Initial forecasts sum to 1.0. Cannot compute additive correction.')
-                result[i] = power_fwd_prices[i] + self.highest_price_ou_model.compute_expected_value(startvalue, expiries[i])/(1.0-tmp)-startvalue
+                result[i] = power_fwd_prices[i]/(1.0-tmp) - self.highest_price_ou_model.compute_expected_value(startvalue, expiries[i])
         return result
     
     def simulate(self, timegrid: np.ndarray, 
@@ -458,8 +459,8 @@ class LinearDemandForwardModel(BaseFwdModel):
                 expiries: List[float],
                 power_fwd_prices: List[float],
                 initial_forecasts: Dict[str, List[float]]):
-        additive_correction = self._compute_additive_correction(expiries, power_fwd_prices, initial_forecasts, startvalue=power_fwd_prices[0])
-        highest_prices = self.highest_price_ou_model.simulate(timegrid, power_fwd_prices[0], rnd[0,:])
+        additive_correction = self._compute_additive_correction(expiries, power_fwd_prices, initial_forecasts, startvalue=0.0)
+        highest_prices = self.highest_price_ou_model.simulate(timegrid, 0.0, rnd[0,:])
         simulated_wind = self.wind_power_forecast.simulate(timegrid, rnd[1:,:], expiries, initial_forecasts)
         return LinearDemandForwardModel.ForwardSimulationResult(self, highest_prices, simulated_wind, additive_correction)
     
@@ -557,10 +558,34 @@ class ResidualDemandForwardModel(BaseFwdModel):
     
 
 if __name__=='__main__':
-    params = WindPowerForecastModelParameter(n_call_strikes=80, min_strike=-9.0, max_strike=9.0)
-    model = WindPowerForecastModel('Onshore', speed_of_mean_reversion=1.5, volatility=0.05, params=params)
+    params = WindPowerForecastModelParameter(n_call_strikes=40, min_strike=-7.0, max_strike=7.0)
+    # setup 
+    wind_region_model = {}
+    vols = [1.0]
+    mean_reversion_speed = [0.5]
+    capacities = [10_000.0]
+    rnd_weights = [ [1.0]
+                ]
+    np.random.seed(42)
+    regions = []
+    for i in range(len(vols)):
+        model = WindPowerForecastModel(region='Region_' + str(i), 
+                                                speed_of_mean_reversion=mean_reversion_speed[i],
+                                                volatility=vols[i], params=params)
+        regions.append(MultiRegionWindForecastModel.Region( 
+                                        model,
+                                        capacity=capacities[i],
+                                        rnd_weights=rnd_weights[i]
+                                    ) )
+    wind = MultiRegionWindForecastModel('Wind_Germany', regions)
+    highest_price = OrnsteinUhlenbeck(speed_of_mean_reversion=1.0, volatility=0.5, mean_reversion_level=0.0)
+    model = LinearDemandForwardModel(wind_power_forecast=wind, 
+                                        highest_price_ou_model= highest_price, 
+                                        power_name= 'Power_Germany')
     timegrid = np.linspace(0.0,1.0, 365)
     np.random.seed(42)
-    rnd = np.random.normal(size=model.rnd_shape(10, timegrid.shape[0]))
-    results = model.simulate(timegrid, rnd, expiries=[1.0], initial_forecasts=[0.8], startvalue=0.0)
-   
+    rnd = np.random.normal(size=model.rnd_shape(10_000, timegrid.shape[0]))
+    results = model.simulate(timegrid, rnd, expiries=[1.0], 
+                            power_fwd_prices=[100.0],
+                            initial_forecasts={'Region_0': [0.8]})
+    results.get('Power_Germany_FWD0')
