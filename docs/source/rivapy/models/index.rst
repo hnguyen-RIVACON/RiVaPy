@@ -7,5 +7,6 @@ Models
 
    stochastic_processes
    equity
-   energy_weather
+   energy/index
+   
 

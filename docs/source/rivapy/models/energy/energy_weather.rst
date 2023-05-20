@@ -1,6 +1,3 @@
-Energy and Weather
-================================
-
 Wind
 ----------------------------------
 The WindPowerModels model the total production of power from wind in percentage of the total wind capacity. That means that all simulated values that will be returned by these models are between 0 and 1.
@@ -46,7 +43,12 @@ SolarPowerModel
 Power
 ----------------------------------------
 
-
+LinearDemandForwardModel
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: rivapy.models.LinearDemandForwardModel
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 ResidualDemandModel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
