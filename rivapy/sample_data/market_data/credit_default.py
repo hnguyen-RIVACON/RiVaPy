@@ -120,7 +120,8 @@ class CreditDefaultData2:
         
     @staticmethod
     def sample(n_years: int, n_data_per_year: int, seed: int=None,
-                cov:np.ndarray=None)->pd.DataFrame: 
+                cov:np.ndarray=None, 
+                include_economic_factor: bool=True)->pd.DataFrame: 
         """Sample credit default data. 
 
         Return a pandas DataFrame that contains some credit features together with the default probability
@@ -163,15 +164,21 @@ class CreditDefaultData2:
                 [0.95,0.95,1.0,0.95],
                 [0.95,0.95,0.95,1.0],])
         mean = np.array([0.0,0.0,0.0,0.0])
-        economic_score = np.random.uniform(0, 0.5, size=n_years)
-        economic_score[-1] = 1.0
-        x = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
-                          columns=['age','income','savings','credit_income_ratio' , 'economic_factor'])
-    
+        if include_economic_factor:
+            economic_score = np.random.uniform(0, 0.5, size=n_years)
+            economic_score[-1] = 1.0
+        if include_economic_factor:
+            x = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
+                            columns=['age','income','savings','credit_income_ratio' , 'economic_factor'])
+        else:
+            x = pd.DataFrame(np.empty((n_years*n_data_per_year, 4)), 
+                            columns=['age','income','savings','credit_income_ratio'])
+        
         for y in range(n_years):
             start = y*n_data_per_year
             end = start + n_data_per_year
-            x['economic_factor'][start:end] = economic_score[y]
+            if include_economic_factor:
+                x['economic_factor'][start:end] = economic_score[y]
             x_ = np.random.multivariate_normal(mean=mean, cov=cov, size=n_data_per_year)
             x_ = pd.DataFrame(x_, 
                           columns=['age','income','savings','credit_income_ratio',])
@@ -202,25 +209,25 @@ class CreditDefaultData2:
         Returns:
             np.ndarray: Vector of default probabilities.
         """
+        
         age = X[:,Features.Age]
         age = 5.0*(1.0-age)*age
         credit_income_ratio = -5.0*0.3*X[:, Features.Credit_income_ratio]
         x1 = 1.5*(X[:, Features.Income])**2
         x2 = 1.5*X[:, Features.Savings]
-        x3 = 1.0-X[:, Features.Economimc_factor]
+        if X.shape[1] == 5: # if the given data does not contain the economic factor, set it to 1.0
+            x3 = 1.0-X[:, Features.Economimc_factor]
+        else:
+            x3 = 0.0
         return 1.0/(1.0+np.exp(2.0*(age+credit_income_ratio + x1+x2+x3)))
     
 
 
 class CreditDefaultDataCategoricalFeature:
-    def __init__(self, seed:int = 42):
-        np.random.seed(seed)
-        self._zip_code_score = [np.random.uniform(0.0, 1.0) for _ in range(10)]
-
-   
-   
-    def sample(self, n_years: int, n_data_per_year: int, seed: int=None,
-                cov:np.ndarray=None)->pd.DataFrame: 
+    zip_code_score = [0.05, 0.13, 0.275, 0.59, 0.42, 0.05,0.87,0.05, 0.21, 0.69]
+    @staticmethod
+    def sample(n_years: int, n_data_per_year: int, seed: int=None,
+                cov:np.ndarray=None, include_economic_factor: bool=True)->pd.DataFrame: 
         """Sample credit default data. 
 
         Return a pandas DataFrame that contains some credit features together with the default probability
@@ -264,15 +271,20 @@ class CreditDefaultDataCategoricalFeature:
                 [0.95,0.95,1.0,0.95],
                 [0.95,0.95,0.95,1.0],])
         mean = np.array([0.0,0.0,0.0,0.0])
-        economic_score = np.random.uniform(0, 0.5, size=n_years)
-        economic_score[-1] = 1.0
-        x = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
-                          columns=['age','income','savings','credit_income_ratio' , 'economic_factor', 'zip_code'])
-    
+        if include_economic_factor:
+            economic_score = np.random.uniform(0, 0.5, size=n_years)
+            economic_score[-1] = 1.0
+            x = pd.DataFrame(np.empty((n_years*n_data_per_year, 5)), 
+                            columns=['age','income','savings','credit_income_ratio' , 'economic_factor'])
+        else:
+            x = pd.DataFrame(np.empty((n_years*n_data_per_year, 4)), 
+                            columns=['age','income','savings','credit_income_ratio' ])
+            
         for y in range(n_years):
             start = y*n_data_per_year
             end = start + n_data_per_year
-            x['economic_factor'][start:end] = economic_score[y]
+            if include_economic_factor:
+                x['economic_factor'][start:end] = economic_score[y]
             x_ = np.random.multivariate_normal(mean=mean, cov=cov, size=n_data_per_year)
             x_ = pd.DataFrame(x_, 
                           columns=['age','income','savings','credit_income_ratio',])
@@ -285,9 +297,9 @@ class CreditDefaultDataCategoricalFeature:
         df = pd.DataFrame(x)
         zip_code_values = np.random.randint(0,10, size=n_years*n_data_per_year)
         
-        df['zip_code_score'] = [self.zip_code_score[zip_code_values[i]] for i in zip_code_values]
+        one_hot_encoded_zip_code = pd.get_dummies(zip_code_values, prefix='zip_code')
+        df = df.merge(one_hot_encoded_zip_code, left_index=True, right_index=True)
         default_prob = CreditDefaultDataCategoricalFeature._predict(df.values)
-        df['zip_code'] = zip_code_values
         df['default_prob'] = default_prob
         tmp = np.random.uniform(low=0.0,high=1.0, size=n_years*n_data_per_year)
         defaulted = np.zeros((n_years*n_data_per_year,))
@@ -295,8 +307,8 @@ class CreditDefaultDataCategoricalFeature:
         df['defaulted'] = defaulted
         return df
     
-    
-    def _predict(self, X: np.ndarray)->np.ndarray:
+    @staticmethod
+    def _predict( X: np.ndarray)->np.ndarray:
         """This method computes the pd and is called by the method sample.
 
         Args:
@@ -310,6 +322,13 @@ class CreditDefaultDataCategoricalFeature:
         credit_income_ratio = -5.0*0.3*X[:, Features.Credit_income_ratio]
         x1 = 1.5*(X[:, Features.Income])**2
         x2 = 1.5*X[:, Features.Savings]
-        x3 = 1.0-X[:, Features.Economimc_factor]
-        x4 = 1.0-X[:, Features.ZIP_code]
+        if X.shape[1]>Features.ZIP_code+9:#check if economic factor is included
+            x3 = 1.0-X[:, Features.Economimc_factor]
+            offset=0
+        else:
+            x3 = 0.0
+            offset = -1
+        x4 = np.zeros((X.shape[0],))
+        for i in range(10):
+            x4 += X[:,Features.ZIP_code+i+offset]*CreditDefaultDataCategoricalFeature.zip_code_score[i]
         return 1.0/(1.0+np.exp(2.0*(age+credit_income_ratio + x1+x2+x3+x4)))
