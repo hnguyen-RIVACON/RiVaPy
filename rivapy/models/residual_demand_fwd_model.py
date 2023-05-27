@@ -407,7 +407,6 @@ class LinearDemandForwardModel(BaseFwdModel):
                         x_mean_reversion_speed: float,
                         forecast_hours: List[int]=None,
                         power_name:str = None):
-        #print(wind_power_forecast)
         self.wind_power_forecast = _create(wind_power_forecast)
         self.highest_price_ou_model = OrnsteinUhlenbeck(x_mean_reversion_speed, x_volatility, 0.0)
         self.forecast_hours = forecast_hours
@@ -419,12 +418,9 @@ class LinearDemandForwardModel(BaseFwdModel):
         
     def _to_dict(self)->dict:
         return {'wind_power_forecast': self.wind_power_forecast.to_dict(),
-                'supply_curve': self.supply_curve.to_dict(),
                 'highest_price_ou_model': self.highest_price_ou_model.to_dict(),
                 'forecast_hours': self.forecast_hours,
-                'max_price': self.max_price,
                 'power_name': self.power_name,
-                #'region_to_capacity': self.region_to_capacity
                 }
 
     def rnd_shape(self, n_sims: int, n_timesteps: int)->tuple:

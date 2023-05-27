@@ -21,14 +21,31 @@ from rivapy.instruments.ppa_specification import GreenPPASpecification
 from rivapy.tools.datetools import DayCounter
 from rivapy.tools.enums import DayCounterType
 from rivapy.tools.datetime_grid import DateTimeGrid
-
+from rivapy.tools.interfaces import FactoryObject
 
 from sklearn.preprocessing import StandardScaler
 #class PPAModel(Protocol):
 #    def __init__(self, )
 
 
+            
+def _generate_lr_schedule(initial_learning_rate: float, decay_step: int, decay_rate: float,):
+    return tf.keras.optimizers.schedules.InverseTimeDecay(
+            initial_learning_rate=initial_learning_rate,#1e-3,
+            decay_steps=decay_step,
+            decay_rate=decay_rate)
+    
+class DeepHedgeModelTrainingParameter(FactoryObject):
+    def __init__(self, epochs: int, batch_size: int, 
+                 initial_learning_rate: float, 
+                 decay_step: int, decay_rate: float, **kwargs):
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.optimizer = optimizer
+        self.learning_rate = learning_rate
+        self.kwargs = kwargs
 
+    
 
 class DeepHedgeModel(tf.keras.Model):
     def __init__(self, hedge_instruments:List[str], 
@@ -89,8 +106,14 @@ class DeepHedgeModel(tf.keras.Model):
             pnl += self._prev_q[:,j]* tf.squeeze(x[j][:,-1])#+ rlzd_qty[:,-1]*(tf.squeeze(power_fwd[:,-1])-self.fixed_price)
         return pnl
 
-    def compute_delta(self, paths: Dict[str, np.ndarray], 
-                        t: Union[int, float]):
+    def compute_delta(self, paths: Dict[str, np.ndarray],
+                      t: Union[int, float]=None):
+        if t is None:
+            result = np.zeros((self.timegrid.shape[0], next(iter(paths.values())).shape[1], 
+                              len(self.hedge_instruments)))
+            for i in range(self.timegrid.shape[0]):
+                result[i,:,:]=self.compute_delta(paths, i)
+            return result
         if isinstance(t, int):
             inputs_ = self._create_inputs(paths, check_timegrid=True)
             inputs = [inputs_[i][:,t] for i in range(len(inputs_))]
@@ -102,6 +125,12 @@ class DeepHedgeModel(tf.keras.Model):
         inputs.append(np.full(inputs[0].shape, fill_value=t))
         return self.model.predict(inputs)
 
+    def _compute_delta_path(self, paths: Dict[str, np.ndarray]):     
+        result = np.zeros((self.timegrid.shape[0], next(iter(paths.values())).shape[0]))
+        for i in range(self.timegrid.shape[0]):
+            result[i,:]=self.compute_delta(paths, i)
+        return result
+    
     def compute_pnl(self, 
                     paths: Dict[str, np.ndarray],
                     payoff: np.ndarray):
@@ -368,7 +397,9 @@ class GreenPPADeepHedgingPricer:
             self.payoff = payoff
 
     @staticmethod
-    def _compute_points(val_date: dt.datetime, green_ppa: GreenPPASpecification, forecast_hours: List[int]):
+    def _compute_points(val_date: dt.datetime, 
+                        green_ppa: GreenPPASpecification, 
+                        forecast_hours: List[int]):
         ppa_schedule = green_ppa.get_schedule()
         if ppa_schedule[-1] <= val_date:
             return None
@@ -393,12 +424,14 @@ class GreenPPADeepHedgingPricer:
                 green_ppa: GreenPPASpecification,
                 power_wind_model: ResidualDemandForwardModel, 
                 initial_forecasts: dict,
-                forecast_hours,
+                power_fwd_prices: np.ndarray,
+                forecast_hours: List[int],
                 depth: int, 
                 nb_neurons: int, 
                 n_sims: int, 
                 regularization: float, 
                 epochs: int,
+                timegrid: DateTimeGrid=None,
                 verbose: bool=0,
                 tensorboard_logdir: str=None, 
                 initial_lr: float = 1e-4, 
@@ -418,6 +451,7 @@ class GreenPPADeepHedgingPricer:
             nb_neurons (int): Number of activation functions. 
             n_sims (int): Number of paths used as input for network training.
             regularization (float): The regularization term entering the loss: Loss is defined by -E[pnl] + regularization*Var(pnl)
+            timegrid (DateTimeGrid, optional): Timegrid used for simulation and hedging. If None, an hourly timegrid is used. Defaults to None.
             epochs (int): Number of epochs for network training.
             verbose (bool, optional): Verbosity level (0, 1 or 2). Defaults to 0.
             tensorboard_logdir (str, optional): Pah to tensorboard log, if None, no log is written. Defaults to None.
@@ -443,7 +477,9 @@ class GreenPPADeepHedgingPricer:
         if len(expiries) == 0:
             return None
         rnd = np.random.normal(size=power_wind_model.rnd_shape(n_sims, timegrid.timegrid.shape[0]))
-        simulation_results = power_wind_model.simulate(timegrid.timegrid, rnd, expiries=expiries, initial_forecasts=initial_forecasts)
+        simulation_results = power_wind_model.simulate(timegrid.timegrid, rnd, expiries=expiries, 
+                                                       initial_forecasts=initial_forecasts,
+                                                       power_fwd_prices=power_fwd_prices)
         
         hedge_ins = {}
         for i in range(len(expiries)):
