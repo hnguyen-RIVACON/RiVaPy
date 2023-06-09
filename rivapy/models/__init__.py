@@ -9,7 +9,7 @@ from rivapy.models.scott_chesney import ScottChesneyModel
 from rivapy.models.ornstein_uhlenbeck import OrnsteinUhlenbeck
 from rivapy.models.lucia_schwartz import LuciaSchwartz
 from rivapy.models.residual_demand_model import ResidualDemandModel,  WindPowerModel, SolarPowerModel, SupplyFunction, LoadModel, SmoothstepSupplyCurve
-from rivapy.models.residual_demand_fwd_model import WindPowerForecastModel, WindPowerForecastModelParameter, ResidualDemandForwardModel, MultiRegionWindForecastModel
+from rivapy.models.residual_demand_fwd_model import WindPowerForecastModel, WindPowerForecastModelParameter, ResidualDemandForwardModel, MultiRegionWindForecastModel, LinearDemandForwardModel
 
 def _add_to_factory(cls):
     factory_entries = _factory()
