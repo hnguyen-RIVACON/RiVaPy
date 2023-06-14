@@ -9,7 +9,7 @@ try:
         pass
 except:
     import warnings
-    warnings.warn('Tensorflow is not installed. You cannot use the PPA pricer!')
+    warnings.warn('Tensorflow is not installed. You cannot use the PPA Deep Hedging Pricer!')
     
 import numpy as np
 import sys

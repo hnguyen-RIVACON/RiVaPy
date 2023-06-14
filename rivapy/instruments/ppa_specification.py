@@ -62,7 +62,7 @@ class SimpleSchedule(interfaces.FactoryObject):
 		"""Return vector of datetime values belonging to the schedule.
 
 		Args:
-			refdate (dt.datetime): All schedule dates are ignored before this reference dats. If None, all schedule dates are returned. Defaults to None.
+			refdate (dt.datetime): All schedule dates are ignored before this reference date. If None, all schedule dates are returned. Defaults to None.
 
 		Returns:
 			np.ndarray: Vector of all datetimepoints of the schedule.
@@ -181,12 +181,13 @@ class PPASpecification(interfaces.FactoryObject):
 
 class GreenPPASpecification(PPASpecification):
 	def __init__(self,
-				udl: str,
 				schedule: Union[SimpleSchedule, List[dt.datetime]],
-				technology: str,
-				location: str,
 				fixed_price: float,
 				max_capacity: float,
+				technology: str,
+				udl: str,
+				location: str=None,
+				
 				id:str = None):
 		"""Green power purchase agreement.
 
@@ -194,12 +195,13 @@ class GreenPPASpecification(PPASpecification):
 		renewable energy such as wind or solar, i.e. the quantity is related to some uncertain production.
 		
 		Args:
-			udl (str): Name of underlying (power) that is delivered (just use for consistency checking within pricing against simulated model values).
-			schedule (Union[SimpleSchedule, List[dt.datetime]]): _description_
-			technology (str): _description_
-			fixed_price (float): _description_
-			max_capacity (float): _description__
-			id (str, optional): _description_. Defaults to None.
+			schedule (Union[SimpleSchedule, List[dt.datetime]]): Delivery schedule.
+			fixed_price (float): Fixed price paid for the power.
+			max_capacity (float): The absolute maximal capacity of the renewable energy source. This is used to derive the production amount of the plant by multiplying forecasts with the factor max_capacity/total_capacity (where total capacity may be time dependent).
+			technology (str): Identifier for the technology. This is used to retrieve the simulated values for production of this technology from a model
+			location (str, optional): Identifier for the location. This is used to retrieve the simulated values for production of this technology at this location from a model that supports this feature. Defaults to None.
+			udl (str, optional): Name of underlying (power) that is delivered (just use for consistency checking within pricing against simulated model values). It is used within pricing when the respective simulated price must be retrieved from a model's simulation results.
+			id (str, optional): Unique identifier of this contract. Defaults to None.
 		"""
 		super().__init__(udl, None, schedule, fixed_price, id)
 		self.technology = technology

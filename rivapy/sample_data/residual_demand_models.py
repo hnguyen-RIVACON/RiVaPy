@@ -38,10 +38,10 @@ class WagnerModel:
 	def wind():
 		def mean_level(a,b,c):
 			def _mean_level(t):
-				return a*np.cos(2.0*np.pi*t + b)+c
+				return a*np.cos(2.0*np.pi*t.timegrid + b)+c
 			return _mean_level
-
-		return WindPowerModel(speed_of_mean_reversion=91.151, volatility=15.155, mean_level=mean_level(0.311, 0.002, -1.999))
+		deviation_model = OrnsteinUhlenbeck(speed_of_mean_reversion = 91.151, volatility=15.155)
+		return WindPowerModel(deviation_model, seasonal_function=mean_level(0.311, 0.002, -1.999))
 
 	@staticmethod
 	def supply():
@@ -77,12 +77,12 @@ class WagnerModel:
 
 
 	@staticmethod
-	def residual_demand_model():
+	def residual_demand_model(capacity_wind=25, capacity_solar=20):
 		solar = WagnerModel.solar()
 		wind = WagnerModel.wind()
 		supply = WagnerModel.supply()
 		load = WagnerModel.load()
-		model = ResidualDemandModel(wind, 25, solar, 20, load, supply)
+		model = ResidualDemandModel(wind, capacity_wind, solar, capacity_solar, load, supply)
 		return model
 
 if __name__=='__main__':
