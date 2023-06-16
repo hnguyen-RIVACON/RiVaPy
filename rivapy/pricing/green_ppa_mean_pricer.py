@@ -3,6 +3,8 @@ import numpy as np
 import sys
 sys.path.append('C:/Users/doeltz/development/RiVaPy/')
 from rivapy.instruments import GreenPPASpecification
+from rivapy.pricing.pricing_request import GreenPPAPricingRequest
+from rivapy.pricing.pricing_results import PricingResultKeys as PRK
 from rivapy.models.base_model import BaseModel
 from rivapy.tools import DateTimeGrid
 from rivapy.pricing._logger import logger
@@ -10,8 +12,9 @@ from rivapy.pricing._logger import logger
 def price(val_date: dt.datetime, 
           spec: GreenPPASpecification, 
           model: BaseModel,
+          pr: GreenPPAPricingRequest,
           n_sims: int = 1000, 
-          seed: int = 42):
+          seed: int = 42) -> float:
     """Compute expected value of Green PPA by MC Simulation for a given model.
 
     Args:
@@ -23,12 +26,11 @@ def price(val_date: dt.datetime,
     """    
     def round_to_hour(t):
         # Rounds to nearest hour by adding a timedelta hour if minute >= 30
-        return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour) +dt.timedelta(hours=t.minute//30))
+        return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour) + dt.timedelta(hours=t.minute//30))
     
     if spec.udl not in model.udls():
         raise ValueError('Model does not support underlying '+spec.udl)
     schedule = spec.get_schedule()
-    start = val_date
     if schedule[-1] <= val_date:
         return 0.0 # specification is expired
     dg = DateTimeGrid(start=round_to_hour(val_date), 
@@ -43,7 +45,18 @@ def price(val_date: dt.datetime,
     df = dg.df
     logger.debug('Finished computing indices for schedule.')
     index = df[df.dates.isin(schedule)].index.values
-    return np.mean(np.multiply(results[spec.technology][index,:],results['price'][index,:]),axis=0)
+    result = {}
+    quantity = results[spec.technology][index,:]# overall total quantity produced. This must be scaled by capacity of the plant in relation to the total capacity
+
+    cf = np.multiply(quantity,results['price'][index,:]-spec.fixed_price)
+    if pr.theo_val:
+        result[PRK.theo_val] = np.mean(cf)
+    if pr.cf_expected:
+        result[PRK.cf_expected] = np.mean(cf,axis=1)
+    if pr.cf_paths:
+        result[PRK.cf_paths] = cf
+    
+    return result
 
 if __name__=="__main__":
     import rivapy.sample_data.residual_demand_models as rdm_sample

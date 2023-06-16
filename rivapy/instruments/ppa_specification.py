@@ -187,9 +187,8 @@ class GreenPPASpecification(PPASpecification):
 				technology: str,
 				udl: str,
 				location: str=None,
-				
 				id:str = None):
-		"""Green power purchase agreement.
+		""" :term:`Specification` for a green power purchase agreement.
 
 		In contrast to a normal PPA the quantities of this PPA are related to some kind of 
 		renewable energy such as wind or solar, i.e. the quantity is related to some uncertain production.
