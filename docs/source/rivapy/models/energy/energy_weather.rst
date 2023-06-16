@@ -33,7 +33,7 @@ Solar
 
 
 SolarPowerModel
-""""""""""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. autoclass:: rivapy.models.SolarPowerModel
    :members:
    :undoc-members:

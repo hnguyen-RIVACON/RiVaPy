@@ -82,7 +82,8 @@ class WagnerModel:
 		wind = WagnerModel.wind()
 		supply = WagnerModel.supply()
 		load = WagnerModel.load()
-		model = ResidualDemandModel(wind, capacity_wind, solar, capacity_solar, load, supply)
+		model = ResidualDemandModel(wind, capacity_wind, solar, capacity_solar,
+			      load, supply, power_name='power')
 		return model
 
 if __name__=='__main__':

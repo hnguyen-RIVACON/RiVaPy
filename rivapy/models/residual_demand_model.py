@@ -94,7 +94,12 @@ class SolarPowerModel(BaseModel):
         Returns:
             Set[str]: Set of the modeled underlyings.
         """
-        return set(self.name)
+        return set([self.name])
+    
+    def _to_dict(self) -> dict:
+        raise NotImplementedError()
+        
+    
 class WindPowerModel(BaseModel):
     
     def _eval_grid(f, timegrid):
@@ -128,7 +133,7 @@ class WindPowerModel(BaseModel):
         Returns:
             Set[str]: Set of the modeled underlyings.
         """
-        return set(self.name)
+        return set([self.name])
     
     def rnd_shape(self, n_sims: int, n_timepoints: int)->tuple:
         return self.deviation_process.rnd_shape(n_sims, n_timepoints)
@@ -157,6 +162,9 @@ class WindPowerModel(BaseModel):
         deviation_model.calibrate(data['des_logit_efficiency'].values,dt=1.0/(24.0*365.0),**kwargs)
         return WindPowerModel(deviation_model, pf_target)
 
+    def _to_dict(self) -> dict:
+        raise NotImplementedError()
+    
 class SmoothstepSupplyCurve(FactoryObject): 
     def __init__(self, s, N):
         self.s = s
@@ -283,7 +291,7 @@ class ResidualDemandModel(BaseModel):
         Returns:
             Set[str]: Set of the modeled underlyings.
         """
-        result = set(self.power_name)
+        result = set([self.power_name])
         result.update(self.wind_model.udls())
         result.update(self.solar_model.udls())
         return result
@@ -296,7 +304,7 @@ class ResidualDemandModel(BaseModel):
                     rnd_wind: np.ndarray=None,
                     rnd_solar: np.ndarray=None,
                     rnd_load: float=None,
-                    rnd_state = None):
+                    seed = None):
         """Simulate the residual demand model on a given datetimegrid.
 
         Args:
@@ -313,7 +321,7 @@ class ResidualDemandModel(BaseModel):
         Returns:
             _type_: _description_
         """
-        np.random.seed(rnd_state)
+        np.random.seed(seed)
         if rnd_wind is None:
             rnd_wind = np.random.normal(size=self.wind_model.rnd_shape(n_sims,timegrid.shape[0]))
         if rnd_solar is None:
@@ -336,7 +344,9 @@ class ResidualDemandModel(BaseModel):
         result['price'] = power_price
         return result
 
-
+    def _to_dict(self) -> dict:
+        raise NotImplementedError()
+    
 if __name__=='__main__':
     from rivapy.models.residual_demand_model import MultiRegionWindForecastModel
     forward_expiries = [(24.0+23.0)/365.0, 24.0*2/365.0]

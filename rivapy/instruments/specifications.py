@@ -53,6 +53,14 @@ else:
     #empty placeholder...
     class BondSpecification:
         pass
+    class ComboSpecification:
+        pass
+    class BarrierSpecification:
+        pass
+    class RainbowSpecification:
+        pass
+    class MemoryExpressSpecification:
+        pass
 
 class EuropeanVanillaSpecification:
     def __init__(self, 

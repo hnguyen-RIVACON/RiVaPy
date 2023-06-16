@@ -53,7 +53,10 @@ class OrnsteinUhlenbeck(FactoryObject):
 
     def simulate(self, timegrid, start_value, rnd):
         """ Simulate the Ornstein Uhlenbeck process on the given timegrid using simple explicit euler scheme:
-            .. math:: X_{t+\\delta t} = X_t + \\theta (\\mu(t) - X_t )\\delta t +\\sigma(t) \\varepsilon \\sqrt{\delta t}
+            
+            .. math:: 
+                
+                X_{t+\\delta t} = X_t + \\theta (\\mu(t) - X_t )\\delta t +\\sigma(t) \\varepsilon \\sqrt{\delta t}
 
             where :math:`\\varepsilon` is a (0,1)-normal random variate.
         
