@@ -420,6 +420,20 @@ class GreenPPADeepHedgingPricer:
         return payoff
 
     @staticmethod
+    def generate_paths(green_ppa: GreenPPASpecification,
+                power_wind_model: ResidualDemandForwardModel, 
+                 initial_forecasts: dict,
+                power_fwd_prices: np.ndarray,
+                n_sims: int, 
+                timegrid: DateTimeGrid=None,):
+        if timegrid is None:
+             timegrid, expiries, _ = GreenPPADeepHedgingPricer._compute_points(val_date, green_ppa, [0])
+        rnd = np.random.normal(size=power_wind_model.rnd_shape(n_sims, timegrid.timegrid.shape[0]))
+        return power_wind_model.simulate(timegrid.timegrid, rnd, expiries=expiries, 
+                                                       initial_forecasts=initial_forecasts,
+                                                       power_fwd_prices=power_fwd_prices)
+
+    @staticmethod
     def price( val_date: dt.datetime,
                 green_ppa: GreenPPASpecification,
                 power_wind_model: ResidualDemandForwardModel, 
