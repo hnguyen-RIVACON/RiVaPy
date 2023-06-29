@@ -188,9 +188,7 @@ class DeepHedgeModel(tf.keras.Model):
         params['hedge_instruments'] = self.hedge_instruments
         with open(folder+'/params.json','w') as f:
             json.dump(params, f)
-        
-        
-        
+
     @staticmethod
     def load(folder: str):
         with open(folder+'/params.json','r') as f:
@@ -287,6 +285,7 @@ class PPAHedgeModel(tf.keras.Model):
         return self.fit(inputs, y, epochs=epochs, 
                             batch_size=batch_size, callbacks=callbacks, verbose=verbose)
 
+    
 def _build_model(depth, nb_neurons, regions: List[str] = None):
     inputs= [tf.keras.Input(shape=(1,),name = "power_fwd_price")]
     if regions is None:
@@ -411,7 +410,10 @@ class GreenPPADeepHedgingPricer:
 
 
     @staticmethod
-    def compute_payoff(n_sims: int, hedge_ins: Dict[str, np.ndarray], additional_states: Dict[str, np.ndarray], green_ppa: GreenPPASpecification):
+    def compute_payoff(n_sims: int, 
+                       hedge_ins: Dict[str, np.ndarray], 
+                       additional_states: Dict[str, np.ndarray], 
+                       green_ppa: GreenPPASpecification):
         payoff = np.zeros((n_sims,))
         for k,v in hedge_ins.items(): #TODO: We assume that each hedge instruments corresponds to the spot price at the last time step. Make this more explicit!
             expiry = k.split('_')[-1]
