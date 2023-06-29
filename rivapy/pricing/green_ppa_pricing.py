@@ -45,8 +45,6 @@ class DeepHedgeModelTrainingParameter(FactoryObject):
         self.learning_rate = learning_rate
         self.kwargs = kwargs
 
-    
-
 class DeepHedgeModel(tf.keras.Model):
     def __init__(self, hedge_instruments:List[str], 
                         additional_states:List[str],
@@ -177,7 +175,9 @@ class DeepHedgeModel(tf.keras.Model):
         self.compile(optimizer=optimizer, loss=self.custom_loss)
         inputs = self._create_inputs(paths)
         return self.fit(inputs, payoff, epochs=epochs, 
-                            batch_size=batch_size, callbacks=callbacks, verbose=verbose)
+                            batch_size=batch_size, callbacks=callbacks, 
+                            verbose=verbose, validation_split=0.1, 
+                            validation_freq=5)
 
     def save(self, folder):
         self.model.save(folder+'/delta_model')
