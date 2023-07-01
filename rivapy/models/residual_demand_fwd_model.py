@@ -405,11 +405,9 @@ class LinearDemandForwardModel(BaseFwdModel):
     def __init__(self, wind_power_forecast: MultiRegionWindForecastModel,
                         x_volatility: float,
                         x_mean_reversion_speed: float,
-                        forecast_hours: List[int]=None,
                         power_name:str = None):
         self.wind_power_forecast = _create(wind_power_forecast)
-        self.highest_price_ou_model = OrnsteinUhlenbeck(x_mean_reversion_speed, x_volatility, 0.0)
-        self.forecast_hours = forecast_hours
+        self.highest_price_ou_model: OrnsteinUhlenbeck = OrnsteinUhlenbeck(x_mean_reversion_speed, x_volatility, 0.0)
         if power_name is not None:
             self.power_name = power_name
         else:
@@ -418,8 +416,8 @@ class LinearDemandForwardModel(BaseFwdModel):
         
     def _to_dict(self)->dict:
         return {'wind_power_forecast': self.wind_power_forecast.to_dict(),
-                'highest_price_ou_model': self.highest_price_ou_model.to_dict(),
-                'forecast_hours': self.forecast_hours,
+                'x_volatility': self.highest_price_ou_model.volatility,
+                'x_mean_reversion_speed': self.highest_price_ou_model.speed_of_mean_reversion,
                 'power_name': self.power_name,
                 }
 
@@ -500,13 +498,11 @@ class ResidualDemandForwardModel(BaseFwdModel):
                         highest_price_ou_model, 
                         supply_curve: Callable[[float], float],
                         max_price: float,
-                        forecast_hours: List[int]=None,
                         power_name:str = None):
         #print(wind_power_forecast)
         self.wind_power_forecast = _create(wind_power_forecast)
         self.highest_price_ou_model = _create(highest_price_ou_model)
         self.supply_curve = _create(supply_curve)
-        self.forecast_hours = forecast_hours
         self.max_price = max_price
         if power_name is not None:
             self.power_name = power_name
@@ -518,7 +514,6 @@ class ResidualDemandForwardModel(BaseFwdModel):
         return {'wind_power_forecast': self.wind_power_forecast.to_dict(),
                 'supply_curve': self.supply_curve.to_dict(),
                 'highest_price_ou_model': self.highest_price_ou_model.to_dict(),
-                'forecast_hours': self.forecast_hours,
                 'max_price': self.max_price,
                 'power_name': self.power_name,
                 #'region_to_capacity': self.region_to_capacity
