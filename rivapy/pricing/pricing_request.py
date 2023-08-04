@@ -3,8 +3,35 @@
 
 from datetime import date, datetime
 from typing import  List as _List, Union as _Union
+from rivapy.tools.interfaces import FactoryObject
 from rivapy.tools.datetools import _date_to_datetime as datetime_to_date, _datetime_to_date_list as datetime_to_date_list
 
+
+class PricingRequestBase(FactoryObject):
+
+    _keys = ['theo_val', 'paths_udl', 'cf_expected', 'cf_paths']
+    
+    def __init__(self, **kwargs):
+        #validate the given keys
+        for key in kwargs.keys():
+            if key not in PricingRequestBase._keys:
+                raise ValueError("Unknown key '{}'".format(key))
+            #set the attributes
+            setattr(self, key, kwargs[key])
+
+    def _to_dict(self) -> dict:
+        return self.__dict__
+
+class GreenPPAPricingRequest(PricingRequestBase):
+    def __init__(self, theo_val: bool, cf_paths: bool=False, cf_expected: bool=False):
+        """PricingRequest for Green PPA pricing.
+
+        Args:
+            price (bool): If True, the :term:`Theoretical Value` is calculated.
+            cf_expected (bool, optional): If True, the paths of the simulated :term:`Cash flow` is returned. Defaults to False.
+        """
+        super().__init__(theo_val=theo_val, cf_expected=cf_expected, cf_paths=cf_paths)
+   
 
 class PricingRequest:
     # def __init__(self, calc_delta_gamma: bool = False, calc_cross_gamma: bool = True, calc_clean_price: bool = False,

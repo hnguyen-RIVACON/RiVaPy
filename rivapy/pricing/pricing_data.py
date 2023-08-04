@@ -10,10 +10,6 @@ if _pyvacon_available:
 
 from rivapy.instruments import CDSSpecification
 
-from rivapy.instruments import CDSSpecification
-
-
-
 from rivapy.marketdata import DiscountCurve, SurvivalCurve 
 from rivapy.tools.interfaces import BaseDatedCurve
 from typing import Union as _Union

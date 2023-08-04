@@ -53,7 +53,10 @@ class OrnsteinUhlenbeck(FactoryObject):
 
     def simulate(self, timegrid, start_value, rnd):
         """ Simulate the Ornstein Uhlenbeck process on the given timegrid using simple explicit euler scheme:
-            .. math:: X_{t+\\delta t} = X_t + \\theta (\\mu(t) - X_t )\\delta t +\\sigma(t) \\varepsilon \\sqrt{\delta t}
+            
+            .. math:: 
+                
+                X_{t+\\delta t} = X_t + \\theta (\\mu(t) - X_t )\\delta t +\\sigma(t) \\varepsilon \\sqrt{\delta t}
 
             where :math:`\\varepsilon` is a (0,1)-normal random variate.
         
@@ -107,6 +110,8 @@ class OrnsteinUhlenbeck(FactoryObject):
             raise NotImplementedError("Expected value is only implemented for constant volatility")
         if callable(self.mean_reversion_level):
             raise NotImplementedError("Expected value is only implemented for constant mean reversion level")
+        if ttm < 1e-5:
+            return np.maximum(X0 - K, 0.0)
         g = X0 * np.exp(-self.speed_of_mean_reversion * ttm) + self.mean_reversion_level * (1.0 - np.exp(-self.speed_of_mean_reversion * ttm))
         sigma_bar = self.volatility * self.volatility * (1.0 / ( 2.0 * self.speed_of_mean_reversion)) 
         sigma_bar = sigma_bar * (1.0 - np.exp(-2.0 * self.speed_of_mean_reversion * ttm))
