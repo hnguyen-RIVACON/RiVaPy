@@ -18,6 +18,20 @@ class DateTimeGrid:
                 daycounter:Union[str, DayCounterType]=DayCounterType.Act365Fixed, 
                 tz=None,
                 inclusive = 'left'):
+        """Object to handle datetimes together with their respective timegridpoints (according to a given daycount convention)
+
+        Args:
+            datetime_grid (pd.DatetimeIndex, optional): A grid of datetime values that is then transformed to datapoints. Defaults to None. Note that either this or a start and end date together with a frequency must be given. If a start date and a datetimegrid are specified at the same time, an exception will be thrown.
+            start (Union[dt.datetime, pd.Timestamp], optional): Start date of the datetime grid. Defaults to None.
+            end (Union[dt.datetime, pd.Timestamp], optional): Enddate of the datetimegrid. The parameter inclusive specifies whether the end date will be included into the grid or not.. Defaults to None.
+            freq (str, optional): A frequency string. Defaults to '1H'. See the documentation for the pandas function :external:py:func:`pandas.date_range` for more details of this string.
+            daycounter (Union[str, DayCounterType], optional): String or daycounterType used to compute the timepoints internally. Defaults to DayCounterType.Act365Fixed.
+            tz (str, optional): Time zone name for returning localized DatetimeIndex, see the pandas function :external:py:func:`pandas.date_range` for more details. Defaults to None.
+            inclusive (str, optional): Defines which boundary is included into the grid, see the pandas function ::external:py:func:`pandas.date_range`. Defaults to 'left'.
+
+        Raises:
+            ValueError: If both, datetime_grid and start, are either None or not None.
+        """
         if (start is not None) and (datetime_grid is not None):
             raise ValueError('Either datetime_grid or start must be None.')
         if start is not None:

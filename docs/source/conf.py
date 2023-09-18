@@ -46,6 +46,8 @@ extensions = [
     "sphinx_gallery.load_style"
 ]
 
+intersphinx_mapping ={'pandas': ('https://pandas.pydata.org/docs/', None)}
+
 # Add bibtex file
 bibtex_bibfiles = ['refs.bib']
 
