@@ -51,7 +51,12 @@ class DateTimeGrid:
             self.df = None
 
         
-    def get_daily_subgrid(self):
+    def get_daily_subgrid(self)->'DateTimeGrid':
+        """Return a new datetime grid that is a subgrid of the current grid consisting of just daily values.
+
+        Returns:
+            DateTimeGrid: Reulting grid.
+        """
         df = self.df.groupby(by=['dates']).min()
         df = df.reset_index()
         result = DateTimeGrid(None, None, freq='1D')
@@ -60,13 +65,6 @@ class DateTimeGrid:
         result.shape = result.timegrid.shape
         result.df = pd.DataFrame({'dates': result.dates, 'tg': result.timegrid})
         return result
-
-    # def get_grid_indices(self, dates):
-    #     df = pd.DataFrame({'dates': self.dates, 'tg': self.timegrid})
-    #     df = df.reset_index()
-    #     df = df.set_index('dates')
-    #     df_tg = pd.DataFrame({'dates_': dates})
-    #     df.join(df_tg)
 
     def get_day_of_year(self):
         if 'day_of_year' not in self.df.columns:
