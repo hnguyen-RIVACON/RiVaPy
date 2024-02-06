@@ -43,7 +43,8 @@ extensions = [
     'sphinx_rtd_theme',
     'sphinxcontrib.bibtex',
     'nbsphinx',
-    "sphinx_gallery.load_style"
+    "sphinx_gallery.load_style",
+    'sphinx.ext.viewcode'
 ]
 
 intersphinx_mapping ={'pandas': ('https://pandas.pydata.org/docs/', None)}
